@@ -21,8 +21,8 @@ import numpy as np
 import pytz
 import torch
 import torch.backends.cudnn as cudnn
-import wandb
 
+import wandb
 from config import Config
 from dataset import SALMONNDataset
 from dist_utils import get_rank, init_distributed_mode
@@ -84,7 +84,6 @@ def main():
     setup_seeds(run_config)
     setup_logger()  # set after init_distributed_mode() to only log on master.
 
-    # Wandb logger
     if run_config.use_distributed:  # 분산 모드 여부 확인
         global_rank = int(os.environ["RANK"])
     else:
