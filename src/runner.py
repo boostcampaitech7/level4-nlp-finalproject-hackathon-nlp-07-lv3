@@ -10,10 +10,10 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
-import wandb
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
@@ -83,6 +83,12 @@ class Runner:
         train_dataset, valid_dataset, test_dataset = split_salmonn_dataset(
             train_dataset, val_ratio=0.2, test_ratio=0.5
         )
+
+        # 별도로 train, validation, test 제이슨 파일이 확정 된 경우 위 로직 지우고
+        # 아래 주석 해제
+        # train_dataset = datasets["train"]
+        # valid_dataset = datasets["valid"]
+        # test_dataset = datasets["test"]
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
