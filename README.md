@@ -19,6 +19,11 @@
 - 학습 데이터 폴더 넣었다면, 이후에 그에 맞춰 train.json도 변경해야 함
 
 ---
+sample dataset(6G)과 NOTA측에서 제공한 기본 모델은 아래 경로에 올려뒀습니다.
+https://drive.google.com/drive/u/0/folders/1WppT1b4goghsOI8BXZBCldordnO_M-cd
+
+
+---
 
 # 2. train
 
