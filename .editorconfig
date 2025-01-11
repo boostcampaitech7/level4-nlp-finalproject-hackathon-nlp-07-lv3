@@ -1,14 +1,3 @@
-# Check http://editorconfig.org for more information
-# This is the main config file for this project:
-# .editconfig 파일은 다양한 IDE 프로그램에서 일관된 코딩 스타일을 유지하도록
-# 도움을 주는 파일으로써 이걸 프로젝트 루트 디렉토리에 추가하면 지원하는
-# 편집기 (거의 다 됨)에서 자동으로 이 설정을 인식하고 적용시켜줌.
-# 근데 VSC의 경우 별도의 플러그인 필요함 Extention에서 설치하면 됨.
-# https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig
-# 위 사이트 참고.
-
-
-
 # 이 파일이 최상위 EditorConfig 파일임을 나타낸다. 즉, 이 파일보다
 # 상위 디렉토리에 다른 EditorConfig 파일이 있더라도 무시되는 것.
 root = true
