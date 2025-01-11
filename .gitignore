@@ -18,7 +18,6 @@ logs/
 
 # 데이터셋(대용량 이므로 불포함)
 data/
-datasets/
 
 # IDE 설정 파일
 .vscode/
