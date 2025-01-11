@@ -1,0 +1,54 @@
+# 본 pyproject.toml 파일은 Python 프로젝트의 설정을 관리하는 파일로써
+# 이 파일은 프로젝트의 빌드 시스템, 패키지 관리, 코드 스타일 등을 정의하는 데 사용됨.
+
+# 이하에서는 ruff 도구의 설정을 정의함.
+[tool.ruff]
+
+# 코드의 최대 줄 길이를 119자로 설정함.
+line-length = 119
+
+# 특정 파일 및 디렉토리를 검사에서 제외함.
+# Exclude the following files and directories.
+exclude = [
+  ".git",
+  ".hg",
+  ".mypy_cache",
+  ".tox",
+  ".venv",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "env",
+  "venv",
+]
+
+# 이하에서는 tool.ruff.lint에 적용되는 설정들
+[tool.ruff.lint]
+
+# Never enforce `E501` (line length violations).
+ignore = ["C901", "E501", "E402"]                       # 특정 린트 규칙을 무시(ignore)하고
+select = ["C", "E", "F", "I", "W"]                      # 선택된(select) 린트 규칙을 적용함
+
+# Ignore import violations in all `__init__.py` files.
+# 이하에서는 tool.ruff.lint.per-file-ignores에 적용되는 설정들이다. 이 섹션은 특정 파일에 대해 무시할 린트 규칙을 정의함
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401", "F403", "F811"]         # __init__.py 파일에서 특정 린트 규칙을 무시합니다.
+
+# 이하에서는 tool.ruff.lint.isort에 적용되는 설정들
+[tool.ruff.lint.isort]
+lines-after-imports = 2                                  # import 문 뒤에 두 줄을 추가함
+
+# 이하에서는 tool.ruff.format에 적용되는 설정들
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"                                   # 문자열에 더블 쿼트를 사용 (더블쿼트? => 문자열을 감싸는 데 사용되는 두 개의 큰 따옴표)
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"                                   # 들여쓰기에 공백을 사용함
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false                        # 매딕 트레일링 콤마를 존중함 (매직 트레일링 콤마? => Python 코드에서 리스트, 딕셔너리, 튜플 등의 마지막 항목 뒤에 오는 쉼표를 의미)
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"                                     # 적절한 줄 끝을 자동으로 감지함

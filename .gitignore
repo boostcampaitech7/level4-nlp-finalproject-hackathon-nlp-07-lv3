@@ -1,0 +1,30 @@
+# 바이트 컴파일된 Python 파일들 무시
+__pycache__/
+*.py[cod]
+
+# 가상 환경설정 파일 무시
+venv/
+env/
+.env
+
+# 모델 체크포인트 및 로그(대용량 및 불필요하므로 무시)
+checkpoints/
+logs/
+*.pt
+*.pth
+*.ckpt
+
+# 데이터셋(대용량 이므로 불포함)
+data/
+datasets/
+
+# IDE 설정 파일
+.vscode/
+
+# 임시 파일
+*.tmp
+*.bak
+
+# 시스템 파일(macOS 또는 Windows에서 자동으로 생성되는 시스템 파일) 무시
+.DS_Store
+Thumbs.db
