@@ -1,47 +1,8 @@
-# .pre-commit-config.yaml 파일의 경우 pre-commit 훅을 설정하는 데 사용됨.
-# pre-commit 훅이란 커밋이 이루어지기 전에 자동으로 실행되는 스크립트로
-# 코드 품질을 유지하고 오류를 방지하는데 도움이 됨.
-# commit 이전에 자동으로 변경점들을 체크할 수 있다는 것에 의의가 있음
-# 사용법은 이하와 같음
-# git init
-# pip install pre-commit 으로 설치하고
-# pre-commit install
-# 그런데 Makefile에서 이미 이거 있음 그래서 수동으로 해줄 필요 없음
-
 repos:
--   repo: local                    # 원격 repo에서 훅을 가져오는 대신 local 환경에서 pre-commit 훅을 실행
+-   repo: local                    
     hooks:
-    - id: style                    # 훅의 ID, 작업의 이름 설정 동일 훅을 구분할 수 있게해줌
-      name: style                  # 훅의 이름, 콘솔 출력시 사용됨
-      language: system             # 실행 환경을 로컬 시스템 명령어로 설정(Python 가상환경이나 OS의 쉘 명령어에서 직접 실행됨 쉽게말해 쓰던 터미널에서 그대로 실행)
-      entry: make style            # 실행할 명령어 `make style` 명령어 실행
-      types: [python]              # 검사할 파일 타입. 여기선 파이썬 파일만 해당
-
-# Q. 아니 루트 디렉토리에 Makefile이 있긴 한데, 이 파일에는 별도로 Makefile 내의 style 이라는 작업을 할 수 있을 정도로 경로를 특정하는 건덕지가
-#    없지 않나요?
-# make 명령어의 경우에 현재 디렉토리에 있는 Makefile을 자동으로 탐색하기에
-# 본 config에
-# entry: make style 이라고 되어있으므로 make 명령어가 실행되어 Makefile을 자동으로 탐색하고 거기 안에서
-# style이라는 작업을 찾아내어 명령어를 실행함.
-
-
-# 아래와 같은 식으로도 원격 훅 가져오는 것도 가능함
-# repos:
-#   - repo: https://github.com/ambv/black
-#     rev: ''
-#     hooks:
-#       - id: black
-#         language_version: python3.8
-#   - repo: https://gitlab.com/pycqa/flake8
-#     rev: ''
-#     hooks:
-#       - id: flake8
-#   - repo: https://github.com/pycqa/isort
-#     rev: ''
-#     hooks:
-#       - id: isort
-#   - repo: https://github.com/necaris/pre-commit-pyright
-#     rev: ''
-#     hooks:
-#       - id: pyright
-
+    - id: style                    
+      name: style                  
+      language: system             
+      entry: make style            
+      types: [python]              
