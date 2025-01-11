@@ -9,6 +9,8 @@ env/
 
 # 모델 체크포인트 및 로그(대용량 및 불필요하므로 무시)
 checkpoints/
+outputs_stage*/
+wandb/
 logs/
 *.pt
 *.pth
@@ -28,3 +30,6 @@ datasets/
 # 시스템 파일(macOS 또는 Windows에서 자동으로 생성되는 시스템 파일) 무시
 .DS_Store
 Thumbs.db
+
+# ruff 캐시 무시
+.ruff_cache/
