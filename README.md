@@ -60,6 +60,7 @@ https://drive.google.com/drive/u/0/folders/1WppT1b4goghsOI8BXZBCldordnO_M-cd
 ### 2.1.2 stage-1 train
 `src` 폴더로 경로 들어와서
 `python3 train.py --cfg-path configs/train_stage1.yaml` 실행
+
 학습 완료 이후 `outputs_stage1` 폴더 만들어진 것 확인하고 안에 가중치 체크(`.pth`)
 
 ## 2.2 stage-2: ACC
