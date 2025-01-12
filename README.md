@@ -63,7 +63,7 @@ https://drive.google.com/drive/u/0/folders/1WppT1b4goghsOI8BXZBCldordnO_M-cd
 
 학습 완료 이후 `outputs_stage1` 폴더 만들어진 것 확인하고 안에 가중치 체크(`.pth`)
 
-## 2.2 stage-2: ACC
+## 2.2 stage-2: AAC
 - stage1 에서 만들어진 모델 가중치를 `train_stage2.yaml`에서 적절히 경로 설정하여 받아줌,
 - 이외에는 `train_stage1.yaml` 설정과 대동소이
 - 학습 종료 후 `outputs_stage2` 폴더 만들어진 것 확인하고 안에 가중치 체크(`.pth`)
