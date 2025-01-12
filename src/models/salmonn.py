@@ -209,7 +209,7 @@ class SALMONN(nn.Module):
         self.prompt_dict = {}
         if prompt_path:
             try:
-                with open(prompt_path, "r") as file:
+                with open(prompt_path, "r", encoding="utf-8") as file:
                     raw_prompts = json.load(file)
             except json.JSONDecodeError:
                 print("Failed to decode JSON! Trying with utf-8 encoding.")
