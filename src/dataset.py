@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import json
-
+import os
 import librosa
 import numpy as np
 import soundfile as sf
@@ -21,7 +21,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from transformers import WhisperFeatureExtractor
-
+from pathlib import Path
 
 class SALMONNDataset(Dataset):
     def __init__(self, prefix, ann_path, whisper_path):
@@ -62,7 +62,8 @@ class SALMONNDataset(Dataset):
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        audio_path = self.prefix + "/" + ann["path"]
+        cwd = Path.cwd()
+        audio_path = cwd / 'src' / 'data' / ann["path"].lstrip("/") if "/" in ann["path"] else cwd / 'src' / 'data' / ann["path"]
         try:
             audio, sr = sf.read(audio_path)
         except (IOError, sf.SoundFileError) as e:
