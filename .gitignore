@@ -32,3 +32,5 @@ Thumbs.db
 
 # ruff 캐시 무시
 .ruff_cache/
+
+.idea
