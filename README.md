@@ -30,8 +30,8 @@ https://drive.google.com/drive/u/0/folders/1WppT1b4goghsOI8BXZBCldordnO_M-cd
 ## 2.1 stage-1: ASR (기본적인 Text 전사학습)
 ### 2.1.1 train_stage1.yaml 에서 경로 및 하이퍼 파라미터 설정
   - **model**
-    - beats_path의 경우 기본값: NOTA에서 제공한 BEATA
-    - ckpt의 경우 stage1에서는 원래대로라면 훈련된 가중치가 없는 것이 맞으나, 훈련 도중 끊긴 체크포인트 혹은 다른 곳에서 얻은 가중치가 있다면 기입 가능
+    - beats_path의 경우 기본값: NOTA에서 제공한 BEATs
+    - ckpt의 경우 stage1에서는 원래대로라면 훈련된 가중치가 없는 것이 맞으나, `훈련 도중 끊긴 체크포인트` 혹은 `다른 곳에서 얻은 가중치`가 있다면 기입 가능
   - **datasets**
     - train/valid/test_ann_path 의 경우에 현재 train.json 밖에 명시적이게 없는데, valid, test.dataset이 없으면 에러가 나서 임시적으로 코드상에서 `train.yaml` `train.py`에서 주석처리, `runner.py`에서 별도 로직 만들어서 train을 valid, test로 쪼개는 방식으로 에러 피해놨음.
     추후에 valid, test 어떤 걸로 할지 정해지면 해당 부분 주석 풀고 로직 수정하면 됨.
