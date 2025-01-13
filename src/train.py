@@ -76,7 +76,7 @@ def main():
 
     # Wandb setup
     if wandb_config.log:
-        wandb.login(key=wandb_config.key)
+        #wandb.login(key=wandb_config.key)
         wandb.init(project=wandb_config.project, entity=wandb_config.entity, config=cfg)
 
     # initialize distributed training
@@ -106,7 +106,6 @@ def main():
         model = load_model(model_config)
     else:  # load small dummy language model
         from transformers import AutoModelForCausalLM
-
         model = AutoModelForCausalLM.from_pretrained("apple/OpenELM-270M-Instruct", trust_remote_code=True)
 
     # build runner
