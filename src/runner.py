@@ -17,7 +17,7 @@ import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
-from utils import get_dataloader, prepare_sample, split_salmonn_dataset
+from utils import get_dataloader, prepare_sample
 
 
 class Runner:
@@ -76,19 +76,9 @@ class Runner:
         else:
             self.model = self._model
 
-        # datasets["train"]는 SALMONNDataset 인스턴스
         train_dataset = datasets["train"]
-
-        # 데이터셋을 train, validation, test로 나누기
-        train_dataset, valid_dataset, test_dataset = split_salmonn_dataset(
-            train_dataset, val_ratio=0.2, test_ratio=0.5
-        )
-
-        # 별도로 train, validation, test 제이슨 파일이 확정 된 경우 위 로직 지우고
-        # 아래 주석 해제
-        # train_dataset = datasets["train"]
-        # valid_dataset = datasets["valid"]
-        # test_dataset = datasets["test"]
+        valid_dataset = datasets["valid"]
+        test_dataset = datasets["test"]
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
@@ -347,16 +337,18 @@ class Runner:
                         best_agg_metric = agg_metrics
                         best_epoch = cur_epoch
 
-                        self.save_checkpoint(cur_epoch, is_best=True)
+                        # 평가 메트릭을 통해서 Best 모델인 경우 저장
+                        save_directory = self.save_checkpoint(cur_epoch, is_best=True)
 
                     valid_log.update({"best_epoch": best_epoch})
                     self.log_stats(valid_log, split_name="valid")
                     wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
 
-            self.save_checkpoint(cur_epoch, is_best=False)
-
             if self.use_distributed:
                 dist.barrier()
+
+        # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
+        self.save_checkpoint(cur_epoch, is_best=False)
 
         # testing phase
         if self.evaluate_only:
@@ -367,6 +359,8 @@ class Runner:
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
+
+        return save_directory
 
     @main_process
     def log_config(self):
@@ -418,3 +412,5 @@ class Runner:
                 oldest_checkpoint = checkpoints[0]
                 os.remove(oldest_checkpoint)
                 logging.info(f"Removed old checkpoint {oldest_checkpoint}.")
+
+        return save_to
