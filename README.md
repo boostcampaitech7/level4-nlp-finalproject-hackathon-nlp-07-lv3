@@ -31,6 +31,7 @@
 ---
 
 # 2. train
+0. src폴더로 경로를 들어가서 `python3 train.py --cfg-path configs/train.yaml 입력 후 CLI에서 wandb 기록이름 설정
 1. train.yaml에서 관련 설정을 체크해줍니다.
 2. 본 train 과정은 이전과 다르게 stage-1, stage-2 에 따른 config.yaml을 따로 받지 않고 train.yaml으로 통일하였습니다.
 3. 공통으로 사용되는 인자들은 그대로 두었습니다. 다만, stage-1, stage-2에 따라서 optim은 다소 다를 수 있겠다고 판단되어 해당 부분과 output_dir은 남겼습니다.
