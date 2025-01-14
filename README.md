@@ -14,59 +14,28 @@
 - requirements.txt 설치
 등등
 
-6. src/data 안에 학습 데이터 통째로 넣어두기
+6. src/data 안에 데이터셋 + 파싱해주는 json 전부 넣어두기
 - stage(1,2) train.json의 경우 샘플로 넣어둔 것
-- 학습 데이터 폴더 넣었다면, 이후에 그에 맞춰 train.json도 변경해야 함
+- 아래 json 전부 있는 것을 가정한 코드
+
+  ![image](https://github.com/user-attachments/assets/b0ff51a2-d00f-4973-be2f-655bdb292cf2)
+
 
 ---
-sample dataset(6G)과 NOTA측에서 제공한 기본 모델은 아래 경로에 올려뒀습니다.
-https://drive.google.com/drive/u/0/folders/1WppT1b4goghsOI8BXZBCldordnO_M-cd
+- sample dataset(6G)과 NOTA측에서 제공한 기본 모델은 아래 경로에 올려뒀습니다.
+  - https://drive.google.com/drive/u/0/folders/1WppT1b4goghsOI8BXZBCldordnO_M-cd
 
+- json 파일은 아래 데이터셋 참고할 것
+  - https://huggingface.co/datasets/lifelongeeek/salmonn_dataset_annotation
 
 ---
 
 # 2. train
+1. train.yaml에서 관련 설정을 체크해줍니다.
+2. 본 train 과정은 이전과 다르게 stage-1, stage-2 에 따른 config.yaml을 따로 받지 않고 train.yaml으로 통일하였습니다.
+3. 공통으로 사용되는 인자들은 그대로 두었습니다. 다만, stage-1, stage-2에 따라서 optim은 다소 다를 수 있겠다고 판단되어 해당 부분과 output_dir은 남겼습니다.
+4. 모델 저장 메트릭도 매 에포크마다 도는 val_data에 대한 성능 측정 결과를 기준으로 best모델과 마지막 epoch에 해당하는 모델만 저장되도록 하였습니다.
 
-## 2.1 stage-1: ASR (기본적인 Text 전사학습)
-### 2.1.1 train_stage1.yaml 에서 경로 및 하이퍼 파라미터 설정
-  - **model**
-    - beats_path의 경우 기본값: NOTA에서 제공한 BEATs
-    - ckpt의 경우 stage1에서는 원래대로라면 훈련된 가중치가 없는 것이 맞으나, `훈련 도중 끊긴 체크포인트` 혹은 `다른 곳에서 얻은 가중치`가 있다면 기입 가능
-  - **datasets**
-    - train/valid/test_ann_path 의 경우에 현재 train.json 밖에 명시적이게 없는데, valid, test.dataset이 없으면 에러가 나서 임시적으로 코드상에서 `train.yaml` `train.py`에서 주석처리, `runner.py`에서 별도 로직 만들어서 train을 valid, test로 쪼개는 방식으로 에러 피해놨음.
-    추후에 valid, test 어떤 걸로 할지 정해지면 해당 부분 주석 풀고 로직 수정하면 됨.
-      ```
-        # train.py 주석부분
-        # build datasets
-        datasets = {
-        "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path, data_config.whisper_path),
-        # "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path, data_config.whisper_path),
-        # "test": SALMONNDataset(data_config.prefix, data_config.test_ann_path, data_config.whisper_path),
-    }
-      ```
-      ```
-        # runner.py 로직 부분(train_dataset으로 valid, test 전부 만들기)
-        # datasets["train"]는 SALMONNDataset 인스턴스
-        train_dataset = datasets["train"]
-
-        # 데이터셋을 train, validation, test로 나누기
-        train_dataset, valid_dataset, test_dataset = split_salmonn_dataset(
-            train_dataset, val_ratio=0.2, test_ratio=0.5
-        )
-      ```
-  - **run**
-    - 현재 기본값은 single GPU에 맞춰져 있음 분산환경에서는 원래의 값으로 변경하면 됨.
-
-### 2.1.2 stage-1 train
-`src` 폴더로 경로 들어와서
-`python3 train.py --cfg-path configs/train_stage1.yaml` 실행
-
-학습 완료 이후 `outputs_stage1` 폴더 만들어진 것 확인하고 안에 가중치 체크(`.pth`)
-
-## 2.2 stage-2: AAC
-- stage1 에서 만들어진 모델 가중치를 `train_stage2.yaml`에서 적절히 경로 설정하여 받아줌,
-- 이외에는 `train_stage1.yaml` 설정과 대동소이
-- 학습 종료 후 `outputs_stage2` 폴더 만들어진 것 확인하고 안에 가중치 체크(`.pth`)
 
 # 3. evaluate
 - `eval_config.yaml`에서 stage2 마친 가중치 가져와서 경로 설정해주고
