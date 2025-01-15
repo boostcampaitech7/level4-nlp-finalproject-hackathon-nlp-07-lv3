@@ -16,6 +16,7 @@ import contextlib
 import json
 import logging
 import random
+import time
 
 import torch
 import torch.nn as nn
@@ -100,7 +101,6 @@ class SALMONN(nn.Module):
         self.max_txt_len = max_txt_len
         self.end_sym = end_sym
         self.low_resource = low_resource
-        self.layer_stats = {}
 
         logging.info("Loading LLaMA Tokenizer")
         self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path, use_fast=False, token=token)
@@ -235,65 +235,77 @@ class SALMONN(nn.Module):
             print("Loading training prompts done!")
 
     def _encode_auditory_feature(self, speech_embeds, audio_embeds=None):
-        with self.maybe_autocast():
-            if self.use_speech_Qformer:
-                speech_embeds = self.ln_speech(speech_embeds)
-                if audio_embeds is not None:
-                    audio_embeds = self.ln_audio(audio_embeds)
-                    if audio_embeds.size(1) < speech_embeds.size(1):
-                        audio_embeds = F.pad(audio_embeds, (0, 0, 0, speech_embeds.size(1) - audio_embeds.size(1)))
-                    elif audio_embeds.size(1) > speech_embeds.size(1):
-                        speech_embeds = F.pad(speech_embeds, (0, 0, 0, audio_embeds.size(1) - speech_embeds.size(1)))
-                    speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
-                speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
+        logging.info("Start Q-Former Encoding")
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
+            with self.maybe_autocast():
+                if self.use_speech_Qformer:
+                    speech_embeds = self.ln_speech(speech_embeds)
+                    if audio_embeds is not None:
+                        audio_embeds = self.ln_audio(audio_embeds)
+                        if audio_embeds.size(1) < speech_embeds.size(1):
+                            audio_embeds = F.pad(audio_embeds, (0, 0, 0, speech_embeds.size(1) - audio_embeds.size(1)))
+                        elif audio_embeds.size(1) > speech_embeds.size(1):
+                            speech_embeds = F.pad(speech_embeds, (0, 0, 0, audio_embeds.size(1) - speech_embeds.size(1)))
+                        speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
+                    speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
 
-                if self.window_level_Qformer:
-                    B, T, C = speech_embeds.shape
-                    kernel = round(1500 * self.second_per_window / 30.0)
-                    stride = round(1500 * self.second_stride / 30.0)
-                    kernel = (1, kernel)
-                    stride = (1, stride)
-                    speech_embeds_tr = speech_embeds.transpose(1, 2).unsqueeze(2)
-                    speech_embeds_overlap = F.unfold(
-                        speech_embeds_tr, kernel_size=kernel, dilation=1, padding=0, stride=stride
+                    if self.window_level_Qformer:
+                        B, T, C = speech_embeds.shape
+                        kernel = round(1500 * self.second_per_window / 30.0)
+                        stride = round(1500 * self.second_stride / 30.0)
+                        kernel = (1, kernel)
+                        stride = (1, stride)
+                        speech_embeds_tr = speech_embeds.transpose(1, 2).unsqueeze(2)
+                        speech_embeds_overlap = F.unfold(
+                            speech_embeds_tr, kernel_size=kernel, dilation=1, padding=0, stride=stride
+                        )
+                        _, _, L = speech_embeds_overlap.shape
+                        speech_embeds_overlap = speech_embeds_overlap.view(B, -1, kernel[1], L)
+                        speech_embeds_overlap = torch.permute(speech_embeds_overlap, [0, 3, 2, 1])
+                        speech_embeds = speech_embeds_overlap.reshape(-1, kernel[1], C)
+                        speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long, device=speech_embeds.device)
+
+                    query_tokens = self.speech_query_tokens.expand(speech_embeds.shape[0], -1, -1)
+                    query_output = self.speech_Qformer.bert(
+                        query_embeds=query_tokens,
+                        encoder_hidden_states=speech_embeds,
+                        encoder_attention_mask=speech_atts,
+                        return_dict=True,
                     )
-                    _, _, L = speech_embeds_overlap.shape
-                    speech_embeds_overlap = speech_embeds_overlap.view(B, -1, kernel[1], L)
-                    speech_embeds_overlap = torch.permute(speech_embeds_overlap, [0, 3, 2, 1])
-                    speech_embeds = speech_embeds_overlap.reshape(-1, kernel[1], C)
-                    speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long, device=speech_embeds.device)
+                    speech_embeds = self.speech_llama_proj(query_output.last_hidden_state)
 
-                query_tokens = self.speech_query_tokens.expand(speech_embeds.shape[0], -1, -1)
-                query_output = self.speech_Qformer.bert(
-                    query_embeds=query_tokens,
-                    encoder_hidden_states=speech_embeds,
-                    encoder_attention_mask=speech_atts,
-                    return_dict=True,
-                )
-                speech_embeds = self.speech_llama_proj(query_output.last_hidden_state)
+                    if self.window_level_Qformer:
+                        speech_embeds = speech_embeds.view(B, -1, speech_embeds.size(2)).contiguous()
 
-                if self.window_level_Qformer:
-                    speech_embeds = speech_embeds.view(B, -1, speech_embeds.size(2)).contiguous()
+                    speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
+                else:
+                    raise NotImplementedError
 
-                speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
-            else:
-                raise NotImplementedError
+        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+        time.sleep(1e-3)
 
         return speech_embeds, speech_atts
 
     def encode_speech(self, spectrogram, raw_wav=None, audio_padding_mask=None):
-        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
-            with self.maybe_autocast():
+        with self.maybe_autocast():
+            logging.info("Start Whipser Encoding")
+            with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
                 speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
 
-                if self.beats_path and raw_wav is not None:
+            print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+            time.sleep(1e-3)
+
+            if self.beats_path and raw_wav is not None:
+                logging.info("Start BEATs Encoding")
+                with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
                     audio_embeds, _ = self.beats.extract_features(
                         raw_wav, padding_mask=audio_padding_mask, feature_only=True
                     )
-                else:
-                    audio_embeds = None
+                print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+                time.sleep(1e-3)
 
-        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+            else:
+                audio_embeds = None
 
         return self._encode_auditory_feature(speech_embeds, audio_embeds=audio_embeds)
 
@@ -473,20 +485,22 @@ class SALMONN(nn.Module):
                 module.register_forward_hook(self.forward_hook)
 
         # calulate loss
-        with self.maybe_autocast():
-            outputs = self.llama_model(
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                return_dict=True,
-                labels=targets,
-            )
-            loss = outputs.loss
+        logging.info("Start LLaMa Encoding")
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                     profile_memory=True,
+                     record_shapes=True,
+                     with_stack=True) as prof:
+            with self.maybe_autocast():
+                outputs = self.llama_model(
+                    inputs_embeds=inputs_embeds,
+                    attention_mask=attention_mask,
+                    return_dict=True,
+                    labels=targets,
+                )
+                loss = outputs.loss
 
-        for module, stats in self.layer_stats.items():
-            print(f"Layer : {module.__class__.__name__}")
-            print(f"Time : {stats['time']:6f} seconds")
-            print(f"Memory : {stats['memory'] / 1e6:2.f} MB")
-            print(f"Peak Memory : {stats['peak_memory'] / 1e6:2.f} MB")
+        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+        time.sleep(1e-3)
 
         if verbose:
             nvocab = self.llama_model.config.vocab_size
