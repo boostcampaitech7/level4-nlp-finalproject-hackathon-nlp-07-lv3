@@ -34,3 +34,5 @@ Thumbs.db
 .ruff_cache/
 
 .idea
+test
+submission.csv

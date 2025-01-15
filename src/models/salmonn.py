@@ -27,7 +27,8 @@ from .beats.BEATs import BEATs, BEATsConfig
 from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub
-
+from torch.profiler import profile, ProfilerActivity
+from torch.profiler import record_function
 
 class SALMONN(nn.Module):
     @classmethod
@@ -99,6 +100,7 @@ class SALMONN(nn.Module):
         self.max_txt_len = max_txt_len
         self.end_sym = end_sym
         self.low_resource = low_resource
+        self.layer_stats = {}
 
         logging.info("Loading LLaMA Tokenizer")
         self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path, use_fast=False, token=token)
@@ -280,15 +282,18 @@ class SALMONN(nn.Module):
         return speech_embeds, speech_atts
 
     def encode_speech(self, spectrogram, raw_wav=None, audio_padding_mask=None):
-        with self.maybe_autocast():
-            speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
+            with self.maybe_autocast():
+                speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
 
-            if self.beats_path and raw_wav is not None:
-                audio_embeds, _ = self.beats.extract_features(
-                    raw_wav, padding_mask=audio_padding_mask, feature_only=True
-                )
-            else:
-                audio_embeds = None
+                if self.beats_path and raw_wav is not None:
+                    audio_embeds, _ = self.beats.extract_features(
+                        raw_wav, padding_mask=audio_padding_mask, feature_only=True
+                    )
+                else:
+                    audio_embeds = None
+
+        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
 
         return self._encode_auditory_feature(speech_embeds, audio_embeds=audio_embeds)
 
@@ -351,6 +356,42 @@ class SALMONN(nn.Module):
             return wrapped_embeds, wrapped_atts
         else:
             return embeds, atts
+
+    def forward_hook(self, module, input, output):
+        if torch.cuda.is_available():
+            # Create CUDA events
+            start_time = torch.cuda.Event(enable_timing=True)
+            end_time = torch.cuda.Event(enable_timing=True)
+
+            # Synchronize and record start time
+            torch.cuda.synchronize()
+            start_time.record()
+
+            # Record memory before execution
+            memory_start = torch.cuda.memory_allocated()
+
+            # Execute the layer
+            output = module(*input)
+
+            # Record end time
+            end_time.record()
+            torch.cuda.synchronize()  # Ensure all GPU operations are finished
+
+            # Record memory after execution
+            memory_end = torch.cuda.memory_allocated()
+
+            # Calculate elapsed time
+            elapsed_time = start_time.elapsed_time(end_time)  # Time in milliseconds
+
+            # Save statistics
+            self.layer_stats[module.__class__.__name__] = {
+                "time": elapsed_time / 1000,  # Convert to seconds
+                "memory": memory_end - memory_start,
+                "peak_memory": torch.cuda.max_memory_allocated(),
+            }
+
+            return output
+
 
     def forward(self, samples, verbose=False):
         # detect whether there are multi tasks in this batch
@@ -426,6 +467,11 @@ class SALMONN(nn.Module):
         inputs_embeds = torch.cat([bos_embeds, speech_embeds, to_regress_embeds], dim=1)
         attention_mask = torch.cat([atts_bos, speech_atts, to_regress_tokens.attention_mask], dim=1)
 
+        # hook for profiling
+        for name, module in self.llama_model.named_modules():
+            if isinstance(module, nn.Linear):
+                module.register_forward_hook(self.forward_hook)
+
         # calulate loss
         with self.maybe_autocast():
             outputs = self.llama_model(
@@ -435,6 +481,12 @@ class SALMONN(nn.Module):
                 labels=targets,
             )
             loss = outputs.loss
+
+        for module, stats in self.layer_stats.items():
+            print(f"Layer : {module.__class__.__name__}")
+            print(f"Time : {stats['time']:6f} seconds")
+            print(f"Memory : {stats['memory'] / 1e6:2.f} MB")
+            print(f"Peak Memory : {stats['peak_memory'] / 1e6:2.f} MB")
 
         if verbose:
             nvocab = self.llama_model.config.vocab_size
