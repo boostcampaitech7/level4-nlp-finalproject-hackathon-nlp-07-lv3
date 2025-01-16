@@ -21,8 +21,8 @@ import numpy as np
 import pytz
 import torch
 import torch.backends.cudnn as cudnn
-
 import wandb
+
 from config import Config
 from dataset import SALMONNDataset
 from dist_utils import get_rank, init_distributed_mode

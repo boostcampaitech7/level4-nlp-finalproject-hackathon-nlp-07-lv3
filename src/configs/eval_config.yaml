@@ -34,22 +34,23 @@ model:
   prompt_path: "./prompts/train_prompt.json"
   test_prompt_path: "./prompts/test_prompt.json"
   max_txt_len: 300
-  end_sym: "<|eot_id|>"   # 사용하는 LLM에 맞춰 변경
+  end_sym: "<|end_of_text|>"   # 사용하는 LLM에 맞춰 변경
 
 generate:
   max_new_tokens: 200
   num_beams: 4
-  do_sample: True
+  do_sample: False
   min_length: 1
   temperature: 1.0
   top_p: 0.9
   repetition_penalty: 1.0
   length_penalty: 1.0
-  end_sym: "<|eot_id|>"  # 사용하는 LLM에 맞춰 변경
+  end_sym: "<|end_of_text|>"
 
 datasets:
   prefix: "./data"
-  test_ann_path: "./data/test_asr.json" # test_asr.json or test_acc.json
+  test_ann_path_asr: "data/test_asr.json"
+  test_ann_path_aac: "data/test_aac.json"
   whisper_path: "openai/whisper-large-v2"
 
 run:

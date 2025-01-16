@@ -10,10 +10,10 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
+import wandb
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
