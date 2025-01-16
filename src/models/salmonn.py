@@ -376,6 +376,8 @@ class SALMONN(nn.Module):
             self.multi_prompt = True
 
         # prepare prompts
+        # 사전에 데이터에서 정의되어 있는 sample들의 task를 보고 task 판단
+        # 해당 task와 관련된 사전에 정의된 prompt를 가져옴 (차후에 인코더 통해서 나온 임베딩 값와 해당 prompt를 결합하여 LLM에 직접 전달)
         if self.prompt_dict:
             if self.multi_prompt:
                 prompt = [random.choice(self.prompt_dict[task]) for task in samples["task"]]
@@ -392,6 +394,7 @@ class SALMONN(nn.Module):
 
         # speech encoder + non-speech encoder 의 결과물을 합쳐서 QFormer를 통과 후에 LLM에 들어가기 위해서 proj 까지 완료된 결과물
         # LLM에 input으로 들어가기 위한 값들
+        # spectrogram 이 Whisper , raw_wav 가 BEATs
         speech_embeds, speech_atts = self.encode_speech(
             spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
         )
