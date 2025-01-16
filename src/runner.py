@@ -133,7 +133,7 @@ class Runner:
         else:
             return model
 
-    def train_epoch(self, epoch):
+    def train_epoch(self, epoch, profile_flag=False):
         self.model.train()
 
         metric_logger = MetricLogger(delimiter="  ")
@@ -160,7 +160,8 @@ class Runner:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
-                    loss = self.model(samples)["loss"]
+                    profile_flag = True if i == 0 and profile_flag else False
+                    loss = self.model(samples, profile_flag=profile_flag)["loss"]
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
@@ -330,41 +331,47 @@ class Runner:
         best_agg_metric = 0
         best_epoch = 0
 
-        for cur_epoch in range(self.start_epoch, self.max_epoch):
-            if self.evaluate_only:
-                break
-
-            # training phase
-            logging.info("Training Phase")
-            train_stats = self.train_epoch(cur_epoch)
-            self.log_stats(train_stats, split_name="train")
-
-            # validating phase
-            logging.info("Validating Phase")
-            valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
-            if valid_log is not None:
-                if is_main_process():
-                    agg_metrics = valid_log["agg_metrics"]
-                    if agg_metrics > best_agg_metric:
-                        best_agg_metric = agg_metrics
-                        best_epoch = cur_epoch
-
-                        self.save_checkpoint(cur_epoch, is_best=True)
-
-                    valid_log.update({"best_epoch": best_epoch})
-                    self.log_stats(valid_log, split_name="valid")
-                    wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
-
-            self.save_checkpoint(cur_epoch, is_best=False)
-
-            if self.use_distributed:
-                dist.barrier()
-
         # testing phase
         if self.evaluate_only:
             test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
             if test_log is not None:
                 self.log_stats(test_log, split_name="test")
+
+        else:
+            start, mid, end = 0, (self.start_epoch + self.max_epoch - 1) // 2, self.max_epoch - 1
+
+            for cur_epoch in range(self.start_epoch, self.max_epoch):
+                # training phase
+                logging.info("Training Phase")
+
+                if cur_epoch == start or cur_epoch == mid or cur_epoch == end:
+                    train_stats = self.train_epoch(cur_epoch, profile_flag=True)
+
+                else:
+                    train_stats = self.train_epoch(cur_epoch, profile_flag=False)
+
+                self.log_stats(train_stats, split_name="train")
+
+                # validating phase
+                logging.info("Validating Phase")
+                valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
+                if valid_log is not None:
+                    if is_main_process():
+                        agg_metrics = valid_log["agg_metrics"]
+                        if agg_metrics > best_agg_metric:
+                            best_agg_metric = agg_metrics
+                            best_epoch = cur_epoch
+
+                            self.save_checkpoint(cur_epoch, is_best=True)
+
+                        valid_log.update({"best_epoch": best_epoch})
+                        self.log_stats(valid_log, split_name="valid")
+                        wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
+
+                self.save_checkpoint(cur_epoch, is_best=False)
+
+                if self.use_distributed:
+                    dist.barrier()
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
