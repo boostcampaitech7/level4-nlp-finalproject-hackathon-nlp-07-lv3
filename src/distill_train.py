@@ -119,42 +119,5 @@ def main():
     # train
     runner.train()
 
-
-
-
-    # hard_label_weight = 0.5
-    # kd_loss_weight = 0.5
-    # temperature = 0.8
-
-    # distill_config = DistillationConfig(
-    #     temperature=temperature,
-    #     # intermediate_matches=intermediate_matches_configs,
-    #     hard_label_weight=hard_label_weight, # cross-entropy 가중치
-    #     kd_loss_weight=kd_loss_weight # logit-based KD 가중치
-    # )
-    # train_config = TrainingConfig(
-    #     output_dir=output_path,
-    #     ckpt_epoch_frequency=1, 
-    #     ckpt_frequency = 10 
-    # )
-
-
-    # build runner
-    # distiller = CustomDistiller(train_config=train_config,
-    #                         distill_cofing=distill_config, 
-    #                         model_T=model_T, 
-    #                         model_S=model_S, 
-    #                         adaptor_T=simple_adaptor, 
-    #                         adaptor_S=simple_adaptor,
-    #                         logits_pro=['linear',model_T.llama_tokenizer.voca_size,model_S.llama_tokenizer.voca_size],
-    #                         global_step_start=0,
-    #                         use_softmax=True,
-    #                         dt_normalization_type='softmax',
-    #                         )
-
-    # train
-    # distiller.train(optimizer, train_dataloader, num_epochs, max_grad_norm=1)
-
-
 if __name__ == "__main__":
     main()
