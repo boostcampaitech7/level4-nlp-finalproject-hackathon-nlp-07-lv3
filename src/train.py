@@ -21,8 +21,8 @@ import numpy as np
 import pytz
 import torch
 import torch.backends.cudnn as cudnn
-import wandb
 
+import wandb
 from config import Config
 from dataset import SALMONNDataset
 from dist_utils import get_rank, init_distributed_mode
@@ -61,6 +61,8 @@ def setup_seeds(config):
     cudnn.benchmark = False
     cudnn.deterministic = True
 
+    return seed
+
 
 def main():
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
@@ -97,7 +99,7 @@ def main():
 
     # initialize distributed training
     init_distributed_mode(run_config)
-    setup_seeds(run_config)
+    SEED = setup_seeds(run_config)
     setup_logger()  # set after init_distributed_mode() to only log on master.
 
     if run_config.use_distributed:  # 분산 모드 여부 확인
@@ -111,11 +113,17 @@ def main():
     cfg.pretty_print()
 
     # build stage1 datasets
-    datasets = {
-        "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
-        "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path),
-        "test": SALMONNDataset(data_config.prefix, data_config.test_ann_path_1, data_config.whisper_path),
-    }
+    # 별도로 valid 지정 없는 경우 train만 생성 후 split
+    if data_config.valid_ann_path_1:
+        datasets = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
+            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path),
+        }
+
+    else:
+        datasets = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
+        }
 
     # build model
     if not args.dryrun:
@@ -126,7 +134,7 @@ def main():
         model = AutoModelForCausalLM.from_pretrained("apple/OpenELM-270M-Instruct", trust_remote_code=True)
 
     # build stage1 runner
-    runner_1 = Runner(cfg, model, datasets, job_id, args.dryrun)
+    runner_1 = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
 
     # stage1 train, return 마지막 ckpt 경로 넘겨 받음
     ckpt_path = runner_1.train()
@@ -135,11 +143,17 @@ def main():
     wandb.finish()
 
     # build stage2 datasets
-    datasets = {
-        "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
-        "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path),
-        "test": SALMONNDataset(data_config.prefix, data_config.test_ann_path_2, data_config.whisper_path),
-    }
+    # 별도로 valid 지정 없는 경우 train만 생성 후 split
+    if data_config.valid_ann_path_2:
+        datasets = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
+            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path),
+        }
+
+    else:
+        datasets = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
+        }
 
     # stage2 optim 설정으로 바꾸기
     cfg.config.run.optims = optims_2
@@ -156,7 +170,7 @@ def main():
         )
 
     # build stage2 runner
-    runner_2 = Runner(cfg, model, datasets, job_id, args.dryrun)
+    runner_2 = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
 
     # stage2 train
     runner_2.train()
