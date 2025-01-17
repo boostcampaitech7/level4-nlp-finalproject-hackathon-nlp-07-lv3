@@ -1,12 +1,13 @@
 from textbrewer import GeneralDistiller
 from textbrewer.distiller_utils import *
 from textbrewer.distiller_basic import BasicDistiller
+
 import torch.distributed as dist
 import torch.nn as nn
+import wandb
 from utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor
 # import pdb
 # from LLMPruner.peft import get_peft_model_state_dict
-# import wandb
 
 
 class CustomDistiller(GeneralDistiller):
@@ -85,45 +86,6 @@ class CustomDistiller(GeneralDistiller):
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
-
-    def save_and_callback(self, global_step, step, epoch, callback):
-        if self.rank != 0:
-            torch.distributed.barrier()    # save and eval with single process
-        else:
-            self.logger.info(f"Saving at global step {global_step}, epoch step {step + 1} epoch {epoch+1}")
-
-            # coreModel = self.model_S.module if hasattr(self.model_S, "module") else self.model_S
-            # state_dict = coreModel.state_dict()
-            # old_state_dict = self.model_S.state_dict
-            
-            ''' 
-                __get__을 통해서 람다 함수 안의 self를 self.model_S로 인스턴스를 고정 및 설정
-                *_, **__로 다른 추가적인 위치 인수와 키워드 인수를 무시함
-                get_peft_model_state_dict를 사용하여서 LoRA 등으로 설정된 내부 가중치를 가져옴
-
-            '''
-
-            # self.model_S.state_dict = (
-            #     lambda self, *_, **__: get_peft_model_state_dict(
-            #         self, old_state_dict()
-            #     )
-            # ).__get__(self.model_S, type(self.model_S))
-
-            # self.model_S.state_dict = old_state_dict
-
-            if hasattr(self.model_S.module, "save_pretrained"):
-                output_dir = self.t_config.output_dir
-                save_path = os.path.join(output_dir, f"globalstep_{global_step + int(self.global_step_start)}")
-                if not os.path.exists(save_path):
-                    print("saving at "+self.t_config.output_dir+"/globalstep_"+str(global_step+int(self.global_step_start)))
-                    self.model_S.module.save_pretrained(self.t_config.output_dir+"/globalstep_"+str(global_step+int(self.global_step_start)))
-
-            if self.local_rank == 0:
-                torch.distributed.barrier()
-        if callback is not None:
-            logger.info("Running callback function...")
-            callback(model=self.model_S, step=global_step)
-            self.model_S.train()
 
     def train_on_batch(self, batch, args=None):
         '''
@@ -204,7 +166,7 @@ class CustomDistiller(GeneralDistiller):
                     else:
                         temperature = self.d_config.temperature
                     if self.kd_type == 'original_kd':
-                        total_kd_loss += self.kd_loss(l_S, l_T, temperature)
+                        total_kd_loss += self.kd_loss(l_S, l_T, temperature) # AbstractDistiller: self.kd_loss = KD_LOSS_MAP[self.d_config.kd_loss_type]
                     elif self.kd_type == 'dynamic_kd':
                         total_kd_loss += self.dynamic_kd_loss(l_S, l_T, temperature)
                     elif self.kd_type == 'dynamic_temperature':
@@ -223,7 +185,7 @@ class CustomDistiller(GeneralDistiller):
                         temperature = self.d_config.temperature
                     
                     if self.kd_type == 'original_kd':
-                        total_kd_loss += self.kd_loss(l_S, l_T, temperature)
+                        total_kd_loss += self.kd_loss(l_S, l_T, temperature) # AbstractDistiller: self.kd_loss = KD_LOSS_MAP[self.d_config.kd_loss_type]
                     elif self.kd_type == 'dynamic_kd':
                         total_kd_loss += self.dynamic_kd_loss(l_S, l_T, temperature)
                     elif self.kd_type == 'dynamic_temperature':
