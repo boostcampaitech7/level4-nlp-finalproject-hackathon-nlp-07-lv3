@@ -1,9 +1,9 @@
 from textbrewer import GeneralDistiller
 from textbrewer.distiller_utils import *
 from textbrewer.distiller_basic import BasicDistiller
-import pdb
-from LLMPruner.peft import get_peft_model_state_dict
-import wandb
+# import pdb
+# from LLMPruner.peft import get_peft_model_state_dict
+# import wandb
 import torch.distributed as dist
 import torch.nn as nn
 from utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor
@@ -11,7 +11,8 @@ from utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softma
 
 class CustomDistiller(GeneralDistiller):
 
-    def __init__(self, train_config,
+    def __init__(self,
+                 train_config,
                  distill_config,
                  model_T,
                  model_S,
@@ -21,7 +22,7 @@ class CustomDistiller(GeneralDistiller):
                  global_step_start,
                  use_softmax,
                  dt_normalization_type,
-                 intermediate_normalization_type,
+                #  intermediate_normalization_type,
                  kd_type : Optional[str] = "original_kd",
                  intermediate_control_config='',
                  layer_weight=0.1,
@@ -35,8 +36,8 @@ class CustomDistiller(GeneralDistiller):
         self.kd_type = kd_type
         self.normalization_type = dt_normalization_type
         assert dt_normalization_type in ['','minmax','softmax','standardize'],"normalization_type is not in ['','minmax','softmax','standardize']"
-        self.intermediate_normalization_type =  intermediate_normalization_type
-        assert intermediate_normalization_type in ['','minmax','softmax'],"intermediate_normalization_type is not in ['','minmax','softmax']"
+        # self.intermediate_normalization_type =  intermediate_normalization_type
+        # assert intermediate_normalization_type in ['','minmax','softmax'],"intermediate_normalization_type is not in ['','minmax','softmax']"
         self.dynamic_kd_loss = dynamic_kd_loss
         self.dynamic_temperature= dynamic_temperature 
         self.projs = []
@@ -47,12 +48,17 @@ class CustomDistiller(GeneralDistiller):
                 dim_in = im.proj[1]
                 dim_out = im.proj[2]
                 self.projs_group.append(im.proj[3])
-                # /textbrewer/presets/PROJ_MAP 
-                # PROJ_MAP에 어떠한 projection이 가능한 다양한 레이어를 담아놓고 있음
-                # 예를 들어 teacher 와 student 간의 Hidden Size가 차이가 나서 이를 차원에 맞게 수정이 필요하여 projection을 위해서 nn.Linear을 사용하면
-                # PROJ_MAP에 저장된 nn.Linear 방식을 사용해서 dim_in, dim_out을 활용해서 이를 선언
-                # PROJ_MAP은 외부에서 선언되어서 가져온 값으로 새로 선언해서 만들 혹은 수정의 필요가 있음
-                # 여기서는 nn.Linear로 고정하되 추후에 projection 방법론 다양화에 따라서 따로 수정해서 진행 필요
+
+                '''
+                    /textbrewer/presets/PROJ_MAP 
+                    PROJ_MAP에 어떠한 projection이 가능한 다양한 레이어를 담아놓고 있음
+                    예를 들어 teacher 와 student 간의 Hidden Size가 차이가 나서 이를 차원에 맞게 수정이 필요하여 projection을 위해서 nn.Linear을 사용하면
+                    PROJ_MAP에 저장된 nn.Linear 방식을 사용해서 dim_in, dim_out을 활용해서 이를 선언
+                    PROJ_MAP은 외부에서 선언되어서 가져온 값으로 새로 선언해서 만들 혹은 수정의 필요가 있음
+                    여기서는 nn.Linear로 고정하되 추후에 projection 방법론 다양화에 따라서 따로 수정해서 진행 필요
+                    
+                '''
+
                 self.projs.append(nn.Linear(dim_in, dim_out))
                 self.projs[-1].to(self.t_config.device)
             else:
@@ -89,9 +95,14 @@ class CustomDistiller(GeneralDistiller):
             # coreModel = self.model_S.module if hasattr(self.model_S, "module") else self.model_S
             # state_dict = coreModel.state_dict()
             # old_state_dict = self.model_S.state_dict
-            # # __get__을 통해서 람다 함수 안의 self를 self.model_S로 인스턴스를 고정 및 설정
-            # # *_, **__로 다른 추가적인 위치 인수와 키워드 인수를 무시함
-            # # get_peft_model_state_dict를 사용하여서 LoRA 등으로 설정된 내부 가중치를 가져옴
+            
+            ''' 
+                __get__을 통해서 람다 함수 안의 self를 self.model_S로 인스턴스를 고정 및 설정
+                *_, **__로 다른 추가적인 위치 인수와 키워드 인수를 무시함
+                get_peft_model_state_dict를 사용하여서 LoRA 등으로 설정된 내부 가중치를 가져옴
+
+            '''
+
             # self.model_S.state_dict = (
             #     lambda self, *_, **__: get_peft_model_state_dict(
             #         self, old_state_dict()
@@ -114,13 +125,30 @@ class CustomDistiller(GeneralDistiller):
             callback(model=self.model_S, step=global_step)
             self.model_S.train()
 
-    def train_on_batch(self, batch, args):
-        
+    def train_on_batch(self, batch, args=None):
+        '''
+            /textbrewer/distiller_utils/get_outputs_from_batch
+
+            with torch.no_grad():
+                results_T = auto_forward(model_T,teacher_batch,args) -> results = model(*batch, **args)
+            
+            results_T의 결과는 cache로 저장되어있거나 없으면 직접 그 자리에서 출력을 받아옴 (model_T는 가중치가 고정)
+            
+        '''
         (teacher_batch, results_T), (student_batch, results_S) = get_outputs_from_batch(batch, self.t_config.device,
                                                                                         self.model_T, self.model_S,
                                                                                         args)
+        '''
+            /textbrewer/distiller_utils/post_adaptor
 
-        # /textbrewer/distiller_utils.py
+            self.adaptor_T 예시 :
+
+            def simple_adaptor(batch, model_outputs):
+                return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
+            
+            post_adaptor 에서 해당 dict 값으로 반환값들을 파싱 후 후처리해서 반환 (각 value 를 list로 묶어서 반환)
+
+        '''
         results_T = post_adaptor(self.adaptor_T(teacher_batch, results_T))
         results_S = post_adaptor(self.adaptor_S(student_batch,  results_S))
 
@@ -129,7 +157,7 @@ class CustomDistiller(GeneralDistiller):
         return total_loss, losses_dict
 
     def compute_loss(self, results_S, results_T, teacher_batch, student_batch):
-        
+        # logit-based feature-based cross-entropy loss의 각각의 값들을 저장
         losses_dict = dict()
         
         total_loss = 0
@@ -144,9 +172,11 @@ class CustomDistiller(GeneralDistiller):
                 logits_list_S = F.softmax(logits_list_S[0], dim=-1)
             
             total_kd_loss = 0
-
-            # textbrewer/distiller_utils/select_logits_with_mask
-            # select_logits_with_mask 에서 attention_mask 을 활용해서 Logits 값 중에서 유효한 값들만 남김
+            
+            '''
+            textbrewer/distiller_utils/select_logits_with_mask
+            select_logits_with_mask 에서 attention_mask 을 활용해서 Logits 값 중에서 유효한 값들만 남김
+            '''
             if 'logits_mask' in results_S:
                 masks_list_S = results_S['logits_mask']
                 logits_list_S = select_logits_with_mask(logits_list_S, masks_list_S)  # (mask_sum, num_of_class)
@@ -154,10 +184,11 @@ class CustomDistiller(GeneralDistiller):
                 masks_list_T = results_T['logits_mask']
                 logits_list_T = select_logits_with_mask(logits_list_T, masks_list_T)  # (mask_sum, num_of_class)
 
-
-            # textbrewer/distiller_utils/probability_shift_
-            # tensor 내부에서 dim 별로 가장 높은 값을 찾아서 해당 값들을 정답이 되는 label 이 되는 값들과 바꾸어서 
-            # teacher-forcing 느낌으로 l_T의 logits 중 정답에 해당 하는 값들이 가장 높게 고정 시킴
+            '''
+            textbrewer/distiller_utils/probability_shift_
+            tensor 내부에서 dim 별로 가장 높은 값을 찾아서 해당 값들을 정답이 되는 label 이 되는 값들과 바꾸어서 
+            teacher-forcing 느낌으로 l_T의 logits 중 정답에 해당 하는 값들이 가장 높게 고정 시킴
+            '''
             if self.d_config.probability_shift is True:
                 labels_list = results_S['labels']
                 for l_T, l_S, labels in zip(logits_list_T, logits_list_S, labels_list):

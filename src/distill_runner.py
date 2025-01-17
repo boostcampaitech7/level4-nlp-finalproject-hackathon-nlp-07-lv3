@@ -18,10 +18,14 @@ from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, 
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample, split_salmonn_dataset
+from distillation import CustomDisitller
+from textbrewer import TrainingConfig, DistillationConfig
 
+def simple_adaptor(batch, model_outputs):
+    return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
 
-class Runner:
-    def __init__(self, cfg, model, datasets, job_id, dryrun):
+class DistllRunner:
+    def __init__(self, cfg, model_T, model_S, datasets, job_id, dryrun):
         self.config = cfg
 
         # dryrun (test with dummy model)
@@ -68,14 +72,35 @@ class Runner:
         else:
             self.test_prompt_dict = None
 
-        # model
-        self._model = model
-        self._model.to(self.device)
+        # model_T
+        self._model_T = model_T
+        self._model_T.to(self.device)
         if self.use_distributed:
-            self.model = DDP(self._model, device_ids=[self.config.config.run.gpu])
+            self.model_T = DDP(self._model_T, device_ids=[self.config.config.run.gpu])
         else:
-            self.model = self._model
+            self.model_T = self._model_T
+        
+        # model_S
+        self._model_S = model_S
+        self._model_S.to(self.device)
+        if self.use_distributed:
+            self.model_S = DDP(self._model_S, device_ids=[self.config.config.run.gpu])
+        else:
+            self.model_S = self._model_S
 
+        self.distiller = CustomDistiller(
+                            train_config=TrainingConfig(),
+                            distill_config=DistillationConfig(),
+                            model_T=model_T, 
+                            model_S=model_S, 
+                            adaptor_T=simple_adaptor, 
+                            adaptor_S=simple_adaptor,
+                            logits_pro=['linear',model_T.llama_tokenizer.voca_size,model_S.llama_tokenizer.voca_size],
+                            global_step_start=0,
+                            use_softmax=True,
+                            dt_normalization_type='softmax',
+                            )
+                            
         # datasets["train"]는 SALMONNDataset 인스턴스
         train_dataset = datasets["train"]
 
@@ -112,7 +137,7 @@ class Runner:
         self.iters_per_epoch = (
             len(self.train_loader) if self.config.config.run.epoch_based else self.config.config.run.iters_per_epoch
         )
-        self.optimizer = get_optimizer(self.model, self.config.config.run.optims)
+        self.optimizer = get_optimizer(self.model_S, self.config.config.run.optims)
         self.scheduler = LinearWarmupCosineLRScheduler(
             self.optimizer,
             max_epoch=self.max_epoch,
@@ -132,7 +157,7 @@ class Runner:
             return model
 
     def train_epoch(self, epoch):
-        self.model.train()
+        self.model_S.train()
 
         metric_logger = MetricLogger(delimiter="  ")
         metric_logger.add_meter("lr", SmoothedValue(window_size=1, fmt="{value:.6f}"))
@@ -157,9 +182,8 @@ class Runner:
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
-                # KD 진행 시에 여기 부분만 변경하면 재활용 가능
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
-                    loss = self.model(samples)["loss"]
+                    loss, _ = self.distiller.train_on_batch(samples)
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
@@ -203,7 +227,7 @@ class Runner:
     @torch.no_grad()
     def valid_epoch(self, epoch, split, decode=False, save_json=False):
         if not self.dryrun:
-            model = self.unwrap_dist_model(self.model)
+            model = self.unwrap_dist_model(self.model_S)
             model.eval()
 
         dataloader = getattr(self, split + "_loader", None)
@@ -389,7 +413,7 @@ class Runner:
         """
         Save the checkpoint at the current epoch.
         """
-        model_no_ddp = self.unwrap_dist_model(self.model)
+        model_no_ddp = self.unwrap_dist_model(self.model_S)
         param_grad_dic = {k: v.requires_grad for (k, v) in model_no_ddp.named_parameters()}
         state_dict = model_no_ddp.state_dict()
         for k in list(state_dict.keys()):

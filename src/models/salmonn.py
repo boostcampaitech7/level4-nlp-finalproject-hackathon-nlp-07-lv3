@@ -78,6 +78,7 @@ class SALMONN(nn.Module):
         lora_alpha=32,
         lora_dropout=0.1,
         multi_prompt=False,
+        distillation=False,
         prompt_path="",
         prompt_template="",
         max_txt_len=128,
@@ -96,6 +97,7 @@ class SALMONN(nn.Module):
         self.second_stride = second_stride
         self.lora = lora
         self.multi_prompt = multi_prompt
+        self.distillation = distillation
         self.max_txt_len = max_txt_len
         self.end_sym = end_sym
         self.low_resource = low_resource
@@ -466,6 +468,9 @@ class SALMONN(nn.Module):
                 labels=targets,
             )
             loss = outputs.loss
+        
+        if self.distillation:
+            return outputs
 
         if verbose:
             nvocab = self.llama_model.config.vocab_size
@@ -571,6 +576,7 @@ class SALMONN(nn.Module):
 
         token = config.get("token", None)
         only_preprocessor = config.get("only_preprocessor", None)
+        distillation = config.get("distillation", False)
 
         model = cls(
             llama_path=llama_path,
@@ -591,6 +597,7 @@ class SALMONN(nn.Module):
             lora_alpha=lora_alpha,
             lora_dropout=lora_dropout,
             multi_prompt=multi_prompt,
+            distillation=distillation,
             prompt_path=prompt_path,
             prompt_template=prompt_template,
             max_txt_len=max_txt_len,
