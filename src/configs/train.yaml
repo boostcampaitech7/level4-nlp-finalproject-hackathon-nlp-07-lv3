@@ -10,11 +10,11 @@ model:
   # paths
   llama_path: "meta-llama/Llama-3.2-3B-Instruct"
   whisper_path: "openai/whisper-large-v2"
-  beats_path: "/home/servingnaverboost/base_line/base_code/temp_storage/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로 
+  beats_path: "/data/data_storage/sample_model/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로 
 
-  token: ""           # 개인 huggingface 키 입력
+  token: "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"           # 개인 huggingface 키 입력
 
-  ckpt: ""            # 기학습된 가중치가 있다면 해당 가중치의 경로
+  ckpt: "/data/data_storage/sample_model/salmonn_3b_nota.pth"            # 기학습된 가중치가 있다면 해당 가중치의 경로
 
 
   freeze_whisper: True
@@ -48,11 +48,9 @@ datasets:
   prefix: "./data"  
   
   train_ann_path_1: "./data/stage1_train.json"  
-  valid_ann_path_1: "./data/stage1_valid.json"  
-  test_ann_path_1: "./data/stage1_test.json"    
+  valid_ann_path_1: "" 
   train_ann_path_2: "./data/stage2_train.json"  
-  valid_ann_path_2: "./data/stage2_valid.json"  
-  test_ann_path_2: "./data/stage2_test.json"  
+  valid_ann_path_2: ""
 
   whisper_path: "openai/whisper-large-v2"
 
