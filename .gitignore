@@ -33,8 +33,11 @@ Thumbs.db
 # ruff 캐시 무시
 .ruff_cache/
 
+
+# 개인 설정값 무시
 .idea
 test
-submission.csv
-log
-src/configs/*.yaml
+*.json
+*.yaml
+*.yml
+*.csv

@@ -10,17 +10,15 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
-from torch.profiler import profile, record_function, ProfilerActivity
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 import wandb
-from transformers import TrainerCallback
-
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
-from utils import get_dataloader, prepare_sample, split_salmonn_dataset
+from utils import get_dataloader, prepare_sample
+
 
 class Runner:
     def __init__(self, cfg, model, datasets, job_id, dryrun):
@@ -78,19 +76,9 @@ class Runner:
         else:
             self.model = self._model
 
-        # datasets["train"]는 SALMONNDataset 인스턴스
         train_dataset = datasets["train"]
-
-        # 데이터셋을 train, validation, test로 나누기
-        train_dataset, valid_dataset, test_dataset = split_salmonn_dataset(
-            train_dataset, val_ratio=0.2, test_ratio=0.5
-        )
-
-        # 별도로 train, validation, test 제이슨 파일이 확정 된 경우 위 로직 지우고
-        # 아래 주석 해제
-        # train_dataset = datasets["train"]
-        # valid_dataset = datasets["valid"]
-        # test_dataset = datasets["test"]
+        valid_dataset = datasets["valid"]
+        test_dataset = datasets["test"]
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
@@ -332,50 +320,51 @@ class Runner:
         best_epoch = 0
 
         # testing phase
+        start, mid, end = 0, (self.start_epoch + self.max_epoch - 1) // 2, self.max_epoch - 1
+
+        for cur_epoch in range(self.start_epoch, self.max_epoch):
+            # training phase
+            logging.info("Training Phase")
+
+            if cur_epoch == start or cur_epoch == mid or cur_epoch == end:
+                train_stats = self.train_epoch(cur_epoch, profile_flag=True)
+
+            else:
+                train_stats = self.train_epoch(cur_epoch, profile_flag=False)
+
+            self.log_stats(train_stats, split_name="train")
+
+            # validating phase
+            logging.info("Validating Phase")
+            valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
+            if valid_log is not None:
+                if is_main_process():
+                    agg_metrics = valid_log["agg_metrics"]
+                    if agg_metrics > best_agg_metric:
+                        best_agg_metric = agg_metrics
+                        best_epoch = cur_epoch
+
+                        save_directory = self.save_checkpoint(cur_epoch, is_best=True)
+
+                    valid_log.update({"best_epoch": best_epoch})
+                    self.log_stats(valid_log, split_name="valid")
+                    wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
+
+            if self.use_distributed:
+                dist.barrier()
+
+        self.save_checkpoint(cur_epoch, is_best=False)
+
         if self.evaluate_only:
             test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
             if test_log is not None:
                 self.log_stats(test_log, split_name="test")
 
-        else:
-            start, mid, end = 0, (self.start_epoch + self.max_epoch - 1) // 2, self.max_epoch - 1
-
-            for cur_epoch in range(self.start_epoch, self.max_epoch):
-                # training phase
-                logging.info("Training Phase")
-
-                if cur_epoch == start or cur_epoch == mid or cur_epoch == end:
-                    train_stats = self.train_epoch(cur_epoch, profile_flag=True)
-
-                else:
-                    train_stats = self.train_epoch(cur_epoch, profile_flag=False)
-
-                self.log_stats(train_stats, split_name="train")
-
-                # validating phase
-                logging.info("Validating Phase")
-                valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
-                if valid_log is not None:
-                    if is_main_process():
-                        agg_metrics = valid_log["agg_metrics"]
-                        if agg_metrics > best_agg_metric:
-                            best_agg_metric = agg_metrics
-                            best_epoch = cur_epoch
-
-                            self.save_checkpoint(cur_epoch, is_best=True)
-
-                        valid_log.update({"best_epoch": best_epoch})
-                        self.log_stats(valid_log, split_name="valid")
-                        wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
-
-                self.save_checkpoint(cur_epoch, is_best=False)
-
-                if self.use_distributed:
-                    dist.barrier()
-
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
+
+        return save_directory
 
     @main_process
     def log_config(self):
@@ -427,3 +416,5 @@ class Runner:
                 oldest_checkpoint = checkpoints[0]
                 os.remove(oldest_checkpoint)
                 logging.info(f"Removed old checkpoint {oldest_checkpoint}.")
+
+        return save_to

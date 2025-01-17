@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import logging
 import time
 
@@ -20,7 +19,7 @@ import librosa
 import numpy as np
 import soundfile as sf
 import torch
-from torch.utils.data import DataLoader, DistributedSampler, random_split
+from torch.utils.data import DataLoader, DistributedSampler
 
 from dist_utils import get_rank, get_world_size, is_main_process
 
@@ -158,41 +157,3 @@ def prepare_one_sample(wav_path, wav_processor, cuda_enabled=True):
         samples = move_to_cuda(samples)
 
     return samples
-
-
-def split_salmonn_dataset(dataset, val_ratio=0.2, test_ratio=0.1):
-    """
-    SALMONNDataset을 train, validation, test로 나눕니다.
-
-    Args:
-        dataset (SALMONNDataset): 전체 데이터셋.
-        val_ratio (float): validation 데이터셋 비율 (기본값: 0.2).
-        test_ratio (float): validation 비율 중 test 데이터셋 비율 (기본값: 0.1).
-
-    Returns:
-        tuple: train, validation, test 데이터셋.
-    """
-    total_len = len(dataset)  # 전체 데이터셋 길이
-
-    # validation 및 test 길이 계산
-    val_len = int(total_len * val_ratio)
-    test_len = int(val_len * test_ratio)
-
-    # train 길이와 validation 재조정
-    train_len = total_len - val_len
-    val_len = val_len - test_len
-
-    # 데이터셋 분할
-    train_subset, valid_subset, test_subset = random_split(dataset, [train_len, val_len, test_len])
-
-    # train, validation, test 데이터셋을 새로 생성
-    train_dataset = copy.deepcopy(dataset)
-    train_dataset.annotation = [dataset.annotation[i] for i in train_subset.indices]
-
-    valid_dataset = copy.deepcopy(dataset)
-    valid_dataset.annotation = [dataset.annotation[i] for i in valid_subset.indices]
-
-    test_dataset = copy.deepcopy(dataset)
-    test_dataset.annotation = [dataset.annotation[i] for i in test_subset.indices]
-
-    return train_dataset, valid_dataset, test_dataset

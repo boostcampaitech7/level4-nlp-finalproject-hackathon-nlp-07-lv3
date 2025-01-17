@@ -15,6 +15,7 @@
 import contextlib
 import json
 import logging
+import random
 import os
 import random
 import time
@@ -150,6 +151,7 @@ class SALMONN(nn.Module):
                     token=token,
                 )
 
+            # 모델 토큰나이저의 사전에 새로운 토큰을 추가하면서 임베딩 레이어 크기가 변화할 필요가 있으니 그에 따라 사이즈를 조정하는 코드
             self.llama_model.resize_token_embeddings(len(self.llama_tokenizer))
             for name, param in self.llama_model.named_parameters():
                 param.requires_grad = False
@@ -169,7 +171,11 @@ class SALMONN(nn.Module):
 
         assert whisper_path
         logging.info("Loading Whisper Model")
+
+        # speech model
         self.speech_encoder = WhisperModel.from_pretrained(whisper_path).encoder
+
+        # speech
         self.ln_speech = nn.LayerNorm(self.speech_encoder.config.d_model)
         if freeze_whisper:
             for name, param in self.speech_encoder.named_parameters():
@@ -181,8 +187,12 @@ class SALMONN(nn.Module):
             logging.info("Loading BEATs Model")
             beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
             beats_cfg = BEATsConfig(beats_ckpt["cfg"])
+
+            # non-speech model
             self.beats = BEATs(beats_cfg)
             self.beats.load_state_dict(beats_ckpt["model"])
+
+            # non-speech
             self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
             if freeze_beats:
                 for name, param in self.beats.named_parameters():
@@ -206,6 +216,8 @@ class SALMONN(nn.Module):
                 layer.output = None
                 layer.intermediate = None
             self.speech_Qformer.cls = None
+
+            # QFormer은 학습 때 사용되기 때문에 학습 시에는 freeze하지 않음
             if freeze_speech_QFormer:
                 for name, param in self.speech_Qformer.named_parameters():
                     param.requires_grad = False
@@ -213,6 +225,7 @@ class SALMONN(nn.Module):
                 self.speech_query_tokens.requires_grad = False
                 logging.info("freeze Speech QFormer")
 
+            # 해당 코드를 논문에서 소개된 두 인코더에서 나온 결과값을 concat 한 z값을 QFormer 통해서 alignment한 H 값을 LLM(LLaMA)에 넣기 위해서 project 하는 코드
             logging.info("Loading speech LLAMA proj")
             if only_preprocessor:
                 config = AutoConfig.from_pretrained(llama_path, token=token)
@@ -220,10 +233,14 @@ class SALMONN(nn.Module):
             else:
                 lm_hidden_size = self.llama_model.config.hidden_size
             self.speech_llama_proj = nn.Linear(self.speech_Qformer.config.hidden_size, lm_hidden_size)
+
+            # self.speech_llama_proj 가중치를 사전에 정의된 값으로 초기화
             if speech_llama_proj_model:
                 logging.info("Loading speech LLAMA proj from {}".format(speech_llama_proj_model))
                 speech_llama_proj_weight = torch.load(speech_llama_proj_model, map_location="cpu")
                 self.load_state_dict(speech_llama_proj_weight["model"], strict=False)
+
+            # self.speeech_llama_proj 가중치 freeze
             if freeze_speech_llama_proj:
                 for name, param in self.speech_llama_proj.named_parameters():
                     param.requires_grad = False
@@ -270,13 +287,19 @@ class SALMONN(nn.Module):
                 speech_embeds = self.ln_speech(speech_embeds)
                 if audio_embeds is not None:
                     audio_embeds = self.ln_audio(audio_embeds)
+
+                    # 두 임베딩 값의 크기를 맞춰서 padding
                     if audio_embeds.size(1) < speech_embeds.size(1):
                         audio_embeds = F.pad(audio_embeds, (0, 0, 0, speech_embeds.size(1) - audio_embeds.size(1)))
                     elif audio_embeds.size(1) > speech_embeds.size(1):
                         speech_embeds = F.pad(speech_embeds, (0, 0, 0, audio_embeds.size(1) - speech_embeds.size(1)))
+
+                    # speech encoder + non-speech encoder 결과를 concat 해서 Z 값
                     speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
                 speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
 
+                # 인코더 결과값들은 고정된 값이 아니라 valiable 한 값이기에 QFormer는 태생적으로 고정된 값들 만을 처리할 수 있다.
+                # 이를 위해서 인코더 결과값들을 슬라이딩 윈도우 방식으로 나누어서 처리하여 가변적인 값들도 QFormer을 이용해서 처리할 수 있게 적용
                 if self.window_level_Qformer:
                     B, T, C = speech_embeds.shape
                     kernel = round(1500 * self.second_per_window / 30.0)
@@ -284,6 +307,8 @@ class SALMONN(nn.Module):
                     kernel = (1, kernel)
                     stride = (1, stride)
                     speech_embeds_tr = speech_embeds.transpose(1, 2).unsqueeze(2)
+
+                    # 입력 텐서에 슬라이딩 윈도우를 적용해서 커널이 지나간 요소들을 Flatten 해서 하나의 벡터로 변환 후 최종적으로 2D tensor로 반환
                     speech_embeds_overlap = F.unfold(
                         speech_embeds_tr, kernel_size=kernel, dilation=1, padding=0, stride=stride
                     )
@@ -300,6 +325,7 @@ class SALMONN(nn.Module):
                     encoder_attention_mask=speech_atts,
                     return_dict=True,
                 )
+                # QFormer 결과값을 LLM 에 들어가기 적합하게 projection
                 speech_embeds = self.speech_llama_proj(query_output.last_hidden_state)
 
                 if self.window_level_Qformer:
@@ -357,6 +383,7 @@ class SALMONN(nn.Module):
                     p_before.append(b)
                     p_after.append(a)
 
+                # input_ids, attention_mask
                 p_before_tokens = self.llama_tokenizer(p_before, return_tensors="pt", add_special_tokens=False).to(
                     embeds.device
                 )
@@ -419,6 +446,8 @@ class SALMONN(nn.Module):
         if self.prompt_dict:
             if self.multi_prompt:
                 prompt = [random.choice(self.prompt_dict[task]) for task in samples["task"]]
+
+                # Q = Qusestion
                 if "Q" in samples:
                     prompt = [p.format(q) if "{}" in p else p for p, q in zip(prompt, samples["Q"])]
             else:
@@ -429,17 +458,22 @@ class SALMONN(nn.Module):
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
 
+        # speech encoder + non-speech encoder 의 결과물을 합쳐서 QFormer를 통과 후에 LLM에 들어가기 위해서 proj 까지 완료된 결과물
+        # LLM에 input으로 들어가기 위한 값들
         speech_embeds, speech_atts = self.encode_speech(
             spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
         )
 
         # wrap speech_embeds with prompts
+        # LLM instruction을 위한 prompt와 결합
         if self.prompt_dict:
             speech_embeds, speech_atts = self.prompt_wrap(
                 speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt
             )
 
         # prepare inputs for LLM
+        # to_regress_tokens은 LLM이 예측할 출력 결과값
+        # self.end_sym은 </s> 으로 EOS 토큰역할을 함
         text = [t + self.end_sym for t in samples["text"]]
         to_regress_tokens = self.llama_tokenizer(
             text,
@@ -454,9 +488,15 @@ class SALMONN(nn.Module):
             if not self.lora
             else self.llama_model.model.model.embed_tokens(to_regress_tokens.input_ids)
         )
+
+        # -100 은 어텐션에서 무시해야하는 토큰 지정하여 loss 계산 시에도 무시
+        # 길이를 맞추기 위해서 적용된 Padding token은 Cross-Entropy Loss 계산 시에는 필요가 없으니 이는 마스킹 처리
         targets = to_regress_tokens.input_ids.masked_fill(
             to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
         )
+
+        # 마찬가지로 오디오 인코더에서 들어온 값들은 LLM이 출력하는 값이 아니기에 여기도 Loss 계산 시에 무시하기 위해서
+        # 오디오 인코더 길이 만큼의 -100 으로 마스킹 처리
         empty_targets = (
             torch.ones([speech_atts.shape[0], speech_atts.shape[1] + 1], dtype=torch.long)
             .to(spectrogram.device)
@@ -465,6 +505,8 @@ class SALMONN(nn.Module):
         targets = torch.cat([empty_targets, targets], dim=1)
 
         batch_size = speech_embeds.shape[0]
+
+        # bos(begin of sentence) 토큰들을 배치 사이즈 만큼 생성하여 배치 내의 모든 요소들을 위한 bos 토큰 생성
         bos = (
             torch.ones(
                 [batch_size, 1],
@@ -482,11 +524,6 @@ class SALMONN(nn.Module):
 
         inputs_embeds = torch.cat([bos_embeds, speech_embeds, to_regress_embeds], dim=1)
         attention_mask = torch.cat([atts_bos, speech_atts, to_regress_tokens.attention_mask], dim=1)
-
-        # hook for profiling
-        # for name, module in self.llama_model.named_modules():
-        #     if isinstance(module, nn.Linear):
-        #         module.register_forward_hook(self.forward_hook)
 
         # calulate loss
         if self.profile_flag:
@@ -512,6 +549,8 @@ class SALMONN(nn.Module):
             mask = labels != -100
             correct = (results[mask] == labels[mask]).float().sum()
             total = len(labels[mask])
+
+        if verbose:
             return {"loss": loss, "correct": correct, "total": total}
 
         return {"loss": loss}
@@ -523,13 +562,17 @@ class SALMONN(nn.Module):
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
 
+        # speech encoder + non-speech encoder 의 결과물을 합쳐서 QFormer를 통과 후에 LLM에 들어가기 위해서 proj 까지 완료된 결과물
+        # LLM에 input으로 들어가기 위한 값들
         speech_embeds, speech_atts = self.encode_speech(
             spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
         )
 
+        # LLM instruction을 위한 prompt와 결합
         if prompts is not None:
             speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompts, multi_prompt=True)
 
+        # bos(begin of sentence) 토큰들을 배치 사이즈 만큼 생성하여 배치 내의 모든 요소들을 위한 bos 토큰 생성
         bos = (
             torch.ones(
                 [batch_size, 1],
@@ -548,6 +591,7 @@ class SALMONN(nn.Module):
         embeds = torch.cat([bos_embeds, speech_embeds], dim=1)
         attns = torch.cat([atts_bos, speech_atts], dim=1)
 
+        # 해당 토큰이 생성되면 생성을 종료한다
         stop_words_ids = [torch.tensor([2]).to(speech_embeds.device)]  # TODO: fix this heuristics
         stopping_criteria = StoppingCriteriaList([StoppingCriteriaSub(stops=stop_words_ids)])
 
@@ -564,6 +608,7 @@ class SALMONN(nn.Module):
             length_penalty=generate_cfg.get("length_penalty", 1.0),
             attention_mask=attns,
         )
+        # 토큰값들을 다시 원본 텍스트로 decoding
         text = self.llama_tokenizer.batch_decode(outputs, add_special_tokens=False)
 
         return text

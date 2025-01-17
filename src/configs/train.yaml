@@ -1,0 +1,103 @@
+wandb:
+  project: "NOTA"
+  entity: "NotyNoty"
+  key: ""             # 개인 W&B 키 입력할 것
+  log: True           # False시 실험 기록 X
+
+
+
+model:
+  # paths
+  llama_path: "meta-llama/Llama-3.2-3B-Instruct"
+  whisper_path: "openai/whisper-large-v2"
+  beats_path: "/home/servingnaverboost/base_line/base_code/temp_storage/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로 
+
+  token: ""           # 개인 huggingface 키 입력
+
+  ckpt: ""            # 기학습된 가중치가 있다면 해당 가중치의 경로
+
+
+  freeze_whisper: True
+  freeze_beats: True
+
+  # window-level Q-Former
+  use_speech_Qformer: True
+  freeze_speech_QFormer: False
+  window_level_Qformer: True
+  num_speech_query_token: 1
+  second_per_window: 0.333333
+  second_stride: 0.333333
+
+  speech_llama_proj_model: ""
+  freeze_speech_llama_proj: False
+
+  # LoRA
+  lora: True
+  lora_rank: 8
+  lora_alpha: 32
+  lora_dropout: 0.1
+
+  multi_prompt: True
+  prompt_template: "USER: {}\nASSISTANT:"
+  prompt_path: "prompts/train_prompt.json"
+  test_prompt_path: "prompts/test_prompt.json"
+  max_txt_len: 300
+  end_sym: "<|eot_id|>"   # LLM 모델에 맞춰 바꿀 것
+
+datasets:
+  prefix: "./data"  
+  
+  train_ann_path_1: "./data/stage1_train.json"  
+  valid_ann_path_1: "./data/stage1_valid.json"  
+  test_ann_path_1: "./data/stage1_test.json"    
+  train_ann_path_2: "./data/stage2_train.json"  
+  valid_ann_path_2: "./data/stage2_valid.json"  
+  test_ann_path_2: "./data/stage2_test.json"  
+
+  whisper_path: "openai/whisper-large-v2"
+
+run:
+  # log & settings
+  seed: 42
+  evaluate: False # if True, only evaluate model on test data
+  # exp_name: "llama-3.2-1B-1percent-stage1" # 코드 전체에서 exp_name이라는 변수 또는 string이 보이지 않음
+
+  log_freq: 1            # 원래 5
+
+  # 에퐄 및 배치 관련 설정
+  epoch_based: True
+  iters_per_epoch: 5     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
+  accum_grad_iters: 1
+  batch_size_train: 2    # 원래 8 
+  batch_size_eval: 2     # 원래 8
+  num_workers: 0         # 원래 8
+
+  device: "cuda"
+  use_distributed: False # 원래 True(분산 환경에서는 True 맞음)
+  amp: True
+  world_size: 1          # 원래 2
+  dist_url: "env://"
+
+  output_dir:
+    stage1_output_dir: "outputs_stage_1"
+    stage2_output_dir: "outputs_stage_2"
+
+  # optimizer & scheduler
+  optims:
+    optims_1:
+      max_epoch: 3        # 원래 30
+      warmup_steps: 10     # 원래 3000
+      warmup_start_lr: 1e-6
+      init_lr: 3e-5
+      min_lr: 1e-5
+      weight_decay: 0.05
+      beta2: 0.999
+    optims_2:
+      max_epoch: 5        # 원래 30
+      warmup_steps: 10     # 원래 3000
+      warmup_start_lr: 1e-6
+      init_lr: 3e-5
+      min_lr: 1e-5
+      weight_decay: 0.05
+      beta2: 0.999
+

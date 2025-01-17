@@ -11,6 +11,7 @@ accelerate==1.2.1
 bitsandbytes==0.45.0
 tensorboard==2.18.0
 torch_tb_profiler==0.4.3
+gradio==4.44.0
 wandb==0.19.1
 omegaconf==2.3.0
 tensorboardX==2.6.2.2

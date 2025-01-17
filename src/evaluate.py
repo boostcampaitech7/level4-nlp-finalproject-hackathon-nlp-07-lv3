@@ -46,6 +46,7 @@ def main(args):
     # Load data
     dataloader = get_dataset(cfg.config.datasets, cfg.config.run, args.task)
 
+    # need abs path in yaml
     with open(cfg.config.model.test_prompt_path, "r", encoding='utf-8') as f:
         test_prompt = json.load(f)
 
