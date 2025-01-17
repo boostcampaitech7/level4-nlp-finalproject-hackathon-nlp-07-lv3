@@ -106,7 +106,7 @@ class Config:
         user_config = self._build_opt_list(self.args.options)
         config = OmegaConf.load(self.args.cfg_path)
         config = OmegaConf.merge(config, user_config)
-        config = self.chage_path_for_os(config)
+        #config = self.chage_path_for_os(config)
         self.config = config
         self.os = os.name
 
