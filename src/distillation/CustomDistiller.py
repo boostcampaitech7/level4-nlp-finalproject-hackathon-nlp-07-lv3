@@ -1,12 +1,12 @@
 from textbrewer import GeneralDistiller
 from textbrewer.distiller_utils import *
 from textbrewer.distiller_basic import BasicDistiller
-# import pdb
-# from LLMPruner.peft import get_peft_model_state_dict
-# import wandb
 import torch.distributed as dist
 import torch.nn as nn
 from utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor
+# import pdb
+# from LLMPruner.peft import get_peft_model_state_dict
+# import wandb
 
 
 class CustomDistiller(GeneralDistiller):
@@ -22,7 +22,7 @@ class CustomDistiller(GeneralDistiller):
                  global_step_start,
                  use_softmax,
                  dt_normalization_type,
-                #  intermediate_normalization_type,
+                #intermediate_normalization_type,
                  kd_type : Optional[str] = "original_kd",
                  intermediate_control_config='',
                  layer_weight=0.1,
@@ -233,55 +233,55 @@ class CustomDistiller(GeneralDistiller):
             losses_dict['unweighted_kd_loss'] = total_kd_loss
 
         # Feature-Based
-        inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
-        inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
-        inputs_mask_T = results_T.get('inputs_mask', None)
-        inputs_mask_S = results_S.get('inputs_mask', None)
-        # pdb.set_trace()
-        for ith, inter_match in enumerate(self.d_config.intermediate_matches):
-            layer_T = inter_match.layer_T
-            layer_S = inter_match.layer_S
-            feature = inter_match.feature
-            loss_type = inter_match.loss
-            match_weight = inter_match.weight
-            match_loss = MATCH_LOSS_MAP[loss_type]
+        # inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
+        # inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
+        # inputs_mask_T = results_T.get('inputs_mask', None)
+        # inputs_mask_S = results_S.get('inputs_mask', None)
+        # # pdb.set_trace()
+        # for ith, inter_match in enumerate(self.d_config.intermediate_matches):
+        #     layer_T = inter_match.layer_T
+        #     layer_S = inter_match.layer_S
+        #     feature = inter_match.feature
+        #     loss_type = inter_match.loss
+        #     match_weight = inter_match.weight
+        #     match_loss = MATCH_LOSS_MAP[loss_type]
 
 
-            if type(layer_S) is list and type(layer_T) is list:
-                inter_S = [inters_S[feature][s] for s in layer_S]
-                inter_T = [inters_T[feature][t] for t in layer_T]
-                name_S = '-'.join(map(str, layer_S))
-                name_T = '-'.join(map(str, layer_T))
-                if self.projs[ith]:
-                    # inter_T = [self.projs[ith](t) for t in inter_T]
-                    # student -> teacher 의 차원으로 projection
-                    inter_S = [self.projs[ith](s) for s in inter_S]
-            else:
-                inter_S = inters_S[feature][layer_S]
-                inter_T = inters_T[feature][layer_T]
-                name_S = str(layer_S)
-                name_T = str(layer_T)
-                if self.projs[ith]:
-                    # inter_T = self.projs[ith](inter_T)
-                    # student -> teacher 의 차원으로 projection
-                    inter_S = inter_S.float()
-                    inter_S = self.projs[ith](inter_S)
+        #     if type(layer_S) is list and type(layer_T) is list:
+        #         inter_S = [inters_S[feature][s] for s in layer_S]
+        #         inter_T = [inters_T[feature][t] for t in layer_T]
+        #         name_S = '-'.join(map(str, layer_S))
+        #         name_T = '-'.join(map(str, layer_T))
+        #         if self.projs[ith]:
+        #             # inter_T = [self.projs[ith](t) for t in inter_T]
+        #             # student -> teacher 의 차원으로 projection
+        #             inter_S = [self.projs[ith](s) for s in inter_S]
+        #     else:
+        #         inter_S = inters_S[feature][layer_S]
+        #         inter_T = inters_T[feature][layer_T]
+        #         name_S = str(layer_S)
+        #         name_T = str(layer_T)
+        #         if self.projs[ith]:
+        #             # inter_T = self.projs[ith](inter_T)
+        #             # student -> teacher 의 차원으로 projection
+        #             inter_S = inter_S.float()
+        #             inter_S = self.projs[ith](inter_S)
 
-            # normalize
-            if len(self.intermediate_normalization_type)>0:
-                if self.intermediate_normalization_type=='minmax':
-                    inter_S = minmax_normalize(inter_S)
-                    inter_T = minmax_normalize(inter_T)
-                elif self.intermediate_normalization_type=='softmax':
-                    inter_S = softmax_normalize(inter_S)
-                    inter_T = softmax_normalize(inter_T)
-                elif self.intermediate_normalization_type=='standardize':
-                    inter_S= standardize_tensor(inter_S)
-                    inter_T= standardize_tensor(inter_T)
+        #     # normalize
+        #     if len(self.intermediate_normalization_type)>0:
+        #         if self.intermediate_normalization_type=='minmax':
+        #             inter_S = minmax_normalize(inter_S)
+        #             inter_T = minmax_normalize(inter_T)
+        #         elif self.intermediate_normalization_type=='softmax':
+        #             inter_S = softmax_normalize(inter_S)
+        #             inter_T = softmax_normalize(inter_T)
+        #         elif self.intermediate_normalization_type=='standardize':
+        #             inter_S= standardize_tensor(inter_S)
+        #             inter_T= standardize_tensor(inter_T)
             
-            intermediate_loss = match_loss(inter_S, inter_T, mask=inputs_mask_S)
-            total_loss += intermediate_loss * match_weight
-            losses_dict[f'unweighted_{feature}_{loss_type}_{name_S}_{name_T}'] = intermediate_loss
+        #     intermediate_loss = match_loss(inter_S, inter_T, mask=inputs_mask_S)
+        #     total_loss += intermediate_loss * match_weight
+        #     losses_dict[f'unweighted_{feature}_{loss_type}_{name_S}_{name_T}'] = intermediate_loss
 
         # Cross-Entropy Loss
         if 'losses' in results_S:
