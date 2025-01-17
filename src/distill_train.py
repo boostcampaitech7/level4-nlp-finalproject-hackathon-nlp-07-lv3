@@ -114,7 +114,7 @@ def main():
         return
 
     # build runner
-    runner = DistillRunner(cfg, model, datasets, job_id, args.dryrun)
+    runner = DistillRunner(cfg, model_T, model_S, datasets, job_id, args.dryrun)
 
     # train
     runner.train()
