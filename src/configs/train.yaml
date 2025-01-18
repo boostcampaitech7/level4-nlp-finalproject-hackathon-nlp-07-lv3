@@ -42,7 +42,7 @@ model:
   prompt_path: "prompts/train_prompt.json"
   test_prompt_path: "prompts/test_prompt.json"
   max_txt_len: 300
-  end_sym: "<|eot_id|>"   # LLM 모델에 맞춰 바꿀 것
+  end_sym: "<|end_of_text|>"   # LLM 모델에 맞춰 바꿀 것
 
 datasets:
   prefix: "../../../../data_storage"  
