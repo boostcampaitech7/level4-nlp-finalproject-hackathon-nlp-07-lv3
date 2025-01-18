@@ -83,7 +83,7 @@ class Runner:
 
         train_dataset = datasets["train"]
 
-        # valid가 있는 경우와 없는 경우 나눠서 데이터셋 생성성
+        # valid가 있는 경우와 없는 경우 나눠서 데이터셋 생성
         train_dataset = datasets["train"]
 
         if "valid" in datasets:
@@ -96,9 +96,9 @@ class Runner:
                 range(len(train_dataset)), [train_size, valid_size], generator=torch.Generator().manual_seed(self.seed)
             )
 
-            train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
             valid_dataset = copy.deepcopy(train_dataset)
-            valid_dataset.annotation = [train_dataset.annotation[i] for i in valid_indices]
+            train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
+            valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
