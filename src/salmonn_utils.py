@@ -65,8 +65,15 @@ class SALMONNTestDataset(Dataset):
             "id": id,
         }
 
+        # evaluate의 경우에는 text가 없으므로 없는 경우 pass 그외에는 전부 있음
         if self.task is not None:
-            entity["text"] = [s["text"] for s in samples]
+            try:
+                entity["text"] = [s["text"] for s in samples]
+
+            except KeyError:
+                pass
+
+
 
         return entity
 
@@ -106,7 +113,12 @@ class SALMONNTestDataset(Dataset):
             "id": ann["path"],
         }
 
+        # evaluate의 경우에는 text가 없으므로 없는 경우 pass 그외에는 전부 있음
         if self.task is not None:
-            entity["text"] = ann["text"]
+            try:
+                entity["text"] = ann["text"]
+
+            except KeyError:
+                pass
 
         return entity
