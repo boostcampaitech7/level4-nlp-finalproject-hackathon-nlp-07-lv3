@@ -16,6 +16,7 @@ tensorboardX==2.6.2.2
 ruff==0.6.8
 pre-commit==3.8.0
 more-itertools==10.5.0
+aac-metrics==0.5.4
 
 # For LLM-Pruner
 numexpr
@@ -33,3 +34,4 @@ importlib-resources
 pycountry
 omegaconf
 pytablewriter
+

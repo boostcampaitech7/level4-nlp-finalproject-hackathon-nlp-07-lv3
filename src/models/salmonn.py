@@ -144,9 +144,9 @@ class SALMONN(nn.Module):
 
         assert whisper_path
         logging.info("Loading Whisper Model")
-        #speech model
+        # speech model
         self.speech_encoder = WhisperModel.from_pretrained(whisper_path).encoder
-        #speech
+        # speech
         self.ln_speech = nn.LayerNorm(self.speech_encoder.config.d_model)
         if freeze_whisper:
             for name, param in self.speech_encoder.named_parameters():
@@ -158,10 +158,10 @@ class SALMONN(nn.Module):
             logging.info("Loading BEATs Model")
             beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
             beats_cfg = BEATsConfig(beats_ckpt["cfg"])
-            #non-speech model
+            # non-speech model
             self.beats = BEATs(beats_cfg)
             self.beats.load_state_dict(beats_ckpt["model"])
-            #non-speech
+            # non-speech
             self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
             if freeze_beats:
                 for name, param in self.beats.named_parameters():
@@ -185,7 +185,7 @@ class SALMONN(nn.Module):
                 layer.output = None
                 layer.intermediate = None
             self.speech_Qformer.cls = None
-            # QFormer은 학습 때 사용되기 때문에 학습 시에는 freeze하지 않음 
+            # QFormer은 학습 때 사용되기 때문에 학습 시에는 freeze하지 않음
             if freeze_speech_QFormer:
                 for name, param in self.speech_Qformer.named_parameters():
                     param.requires_grad = False
@@ -249,7 +249,7 @@ class SALMONN(nn.Module):
                 speech_embeds = self.ln_speech(speech_embeds)
                 if audio_embeds is not None:
                     audio_embeds = self.ln_audio(audio_embeds)
-                    # 두 임베딩 값의 크기를 맞춰서 padding 
+                    # 두 임베딩 값의 크기를 맞춰서 padding
                     if audio_embeds.size(1) < speech_embeds.size(1):
                         audio_embeds = F.pad(audio_embeds, (0, 0, 0, speech_embeds.size(1) - audio_embeds.size(1)))
                     elif audio_embeds.size(1) > speech_embeds.size(1):
@@ -267,7 +267,7 @@ class SALMONN(nn.Module):
                     kernel = (1, kernel)
                     stride = (1, stride)
                     speech_embeds_tr = speech_embeds.transpose(1, 2).unsqueeze(2)
-                    # 입력 텐서에 슬라이딩 윈도우를 적용해서 커널이 지나간 요소들을 Flatten 해서 하나의 벡터로 변환 후 최종적으로 2D tensor로 반환 
+                    # 입력 텐서에 슬라이딩 윈도우를 적용해서 커널이 지나간 요소들을 Flatten 해서 하나의 벡터로 변환 후 최종적으로 2D tensor로 반환
                     speech_embeds_overlap = F.unfold(
                         speech_embeds_tr, kernel_size=kernel, dilation=1, padding=0, stride=stride
                     )
@@ -430,7 +430,7 @@ class SALMONN(nn.Module):
         targets = to_regress_tokens.input_ids.masked_fill(
             to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
         )
-        # 마찬가지로 오디오 인코더에서 들어온 값들은 LLM이 출력하는 값이 아니기에 여기도 Loss 계산 시에 무시하기 위해서 
+        # 마찬가지로 오디오 인코더에서 들어온 값들은 LLM이 출력하는 값이 아니기에 여기도 Loss 계산 시에 무시하기 위해서
         # 오디오 인코더 길이 만큼의 -100 으로 마스킹 처리
         empty_targets = (
             torch.ones([speech_atts.shape[0], speech_atts.shape[1] + 1], dtype=torch.long)

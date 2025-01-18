@@ -1,5 +1,6 @@
 # This script is based on https://github.com/salesforce/LAVIS/blob/main/lavis/runners/runner_base.py
 
+import copy
 import datetime
 import glob
 import json
@@ -12,16 +13,20 @@ import torch
 import torch.distributed as dist
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import random_split
 
 import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
-from utils import get_dataloader, prepare_sample, split_salmonn_dataset
+from utils import get_dataloader, prepare_sample
 
 
 class Runner:
-    def __init__(self, cfg, model, datasets, job_id, dryrun):
+    def __init__(self, cfg, model, datasets, job_id, dryrun, SEED):
+        # SEED 설정
+        self.seed = SEED
+
         self.config = cfg
 
         # dryrun (test with dummy model)
@@ -76,19 +81,24 @@ class Runner:
         else:
             self.model = self._model
 
-        # datasets["train"]는 SALMONNDataset 인스턴스
         train_dataset = datasets["train"]
 
-        # 데이터셋을 train, validation, test로 나누기
-        train_dataset, valid_dataset, test_dataset = split_salmonn_dataset(
-            train_dataset, val_ratio=0.2, test_ratio=0.5
-        )
+        # valid가 있는 경우와 없는 경우 나눠서 데이터셋 생성
+        train_dataset = datasets["train"]
 
-        # 별도로 train, validation, test 제이슨 파일이 확정 된 경우 위 로직 지우고
-        # 아래 주석 해제
-        # train_dataset = datasets["train"]
-        # valid_dataset = datasets["valid"]
-        # test_dataset = datasets["test"]
+        if "valid" in datasets:
+            valid_dataset = datasets["valid"]
+        else:
+            train_size = int(0.8 * len(train_dataset))
+            valid_size = len(train_dataset) - train_size
+
+            train_indices, valid_indices = random_split(
+                range(len(train_dataset)), [train_size, valid_size], generator=torch.Generator().manual_seed(self.seed)
+            )
+
+            valid_dataset = copy.deepcopy(train_dataset)
+            train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
+            valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
@@ -96,9 +106,6 @@ class Runner:
         )
         self.valid_loader = get_dataloader(
             valid_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
-        )
-        self.test_loader = get_dataloader(
-            test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         )
 
         # scaler
@@ -349,16 +356,18 @@ class Runner:
                         best_agg_metric = agg_metrics
                         best_epoch = cur_epoch
 
-                        self.save_checkpoint(cur_epoch, is_best=True)
+                        # 평가 메트릭을 통해서 Best 모델인 경우 저장
+                        save_directory = self.save_checkpoint(cur_epoch, is_best=True)
 
                     valid_log.update({"best_epoch": best_epoch})
                     self.log_stats(valid_log, split_name="valid")
                     wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
 
-            self.save_checkpoint(cur_epoch, is_best=False)
-
             if self.use_distributed:
                 dist.barrier()
+
+        # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
+        self.save_checkpoint(cur_epoch, is_best=False)
 
         # testing phase
         if self.evaluate_only:
@@ -369,6 +378,8 @@ class Runner:
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
+
+        return save_directory
 
     @main_process
     def log_config(self):
@@ -421,3 +432,4 @@ class Runner:
                 os.remove(oldest_checkpoint)
                 logging.info(f"Removed old checkpoint {oldest_checkpoint}.")
 
+        return save_to
