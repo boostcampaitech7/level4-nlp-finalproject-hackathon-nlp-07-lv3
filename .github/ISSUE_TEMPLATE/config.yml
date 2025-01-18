@@ -1,0 +1,4 @@
+# Configuration: https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository
+
+# 사용자가 빈(blank) 이슈를 생성할 수 있는지 여부 (현재 False) 
+blank_issues_enabled: false
