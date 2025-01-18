@@ -39,8 +39,9 @@ def now():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="train parameters")
-    parser.add_argument("--cfg-model-T-path", type=str, required=True, help="path to configuration file")
-    parser.add_argument("--cfg-model-S-path", type=str, required=True, help="path to configuration file")
+    parser.add_argument("--cfg-path", type=str, required=True, help="path to configuration file")
+    # parser.add_argument("--cfg-model-T-path", type=str, required=True, help="path to configuration file")
+    # parser.add_argument("--cfg-model-S-path", type=str, required=True, help="path to configuration file")
     parser.add_argument(
         "--options",
         nargs="+",

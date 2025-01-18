@@ -164,7 +164,6 @@ class Runner:
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
-                # KD 진행 시에 여기 부분만 변경하면 재활용 가능
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     loss = self.model(samples)["loss"]
 

@@ -157,6 +157,7 @@ class DistllRunner:
             return model
 
     def train_epoch(self, epoch):
+        self.model_T.eval()
         self.model_S.train()
 
         metric_logger = MetricLogger(delimiter="  ")

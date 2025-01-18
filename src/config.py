@@ -69,12 +69,15 @@ class DistillConfig:
 
         self.args = args
         user_config = self._build_opt_list(self.args.options)
-        config_T = OmegaConf.load(self.args.cfg_model_T_path)
-        config_T = OmegaConf.merge(config_T, user_config)
-        config_S = OmegaConf.load(self.args.cfg_model_S_path)
-        config_S = OmegaConf.merge(config_S, user_config)
-        self.config_T = config_T
-        self.config_S = config_S
+        config = OmegaConf.load(self.args.cfg_path)
+        config = OmegaConf.merge(config, user_config)
+        self.config = config
+        # config_T = OmegaConf.load(self.args.cfg_model_T_path)
+        # config_T = OmegaConf.merge(config_T, user_config)
+        # config_S = OmegaConf.load(self.args.cfg_model_S_path)
+        # config_S = OmegaConf.merge(config_S, user_config)
+        # self.config_T = config_T
+        # self.config_S = config_S
 
     def _convert_to_dot_list(self, opts):
         if opts is None:
