@@ -5,7 +5,7 @@ import numpy as np
 from transformers import PreTrainedTokenizerBase
 from transformers.utils import PaddingStrategy
 import sys
-sys.path.append('./lm_evaluation_harness')
+sys.path.append('./src/lm_evaluation_harness')
 from lm_eval import tasks, evaluator
 import lm_eval
 import json

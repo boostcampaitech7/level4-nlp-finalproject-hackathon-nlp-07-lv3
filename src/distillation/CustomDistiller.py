@@ -5,7 +5,7 @@ from textbrewer.distiller_basic import BasicDistiller
 import torch.distributed as dist
 import torch.nn as nn
 import wandb
-from utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor
+from distillation.utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor
 # import pdb
 # from LLMPruner.peft import get_peft_model_state_dict
 

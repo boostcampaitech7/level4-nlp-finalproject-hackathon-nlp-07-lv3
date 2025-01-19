@@ -104,8 +104,11 @@ class DistillConfig:
         logging.info("\n======  Dataset Attributes  ======")
         logging.info(self._convert_node_to_json(self.config.datasets))
 
-        logging.info("\n======  Model Attributes  ======")
-        logging.info(self._convert_node_to_json(self.config.model))
+        logging.info("\n======  Mode_T Attributes  ======")
+        logging.info(self._convert_node_to_json(self.config.model_T))
+
+        logging.info("\n======  Mode_S Attributes  ======")
+        logging.info(self._convert_node_to_json(self.config.model_S))
 
     def _convert_node_to_json(self, node):
         container = OmegaConf.to_container(node, resolve=True)

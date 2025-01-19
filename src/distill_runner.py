@@ -17,15 +17,16 @@ import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
-from utils import get_dataloader, prepare_sample, split_salmonn_dataset
-from distillation import CustomDisitller
+from utils import get_dataloader, prepare_sample
+from distillation import CustomDistiller
 from textbrewer import TrainingConfig, DistillationConfig
 
 def simple_adaptor(batch, model_outputs):
     return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
 
-class DistllRunner:
-    def __init__(self, cfg, model_T, model_S, datasets, job_id, dryrun):
+class DistillRunner:
+    def __init__(self, cfg, model_T, model_S, datasets, job_id, dryrun, SEED):
+        self.seed = SEED
         self.config = cfg
 
         # dryrun (test with dummy model)
@@ -104,16 +105,20 @@ class DistllRunner:
         # datasets["train"]는 SALMONNDataset 인스턴스
         train_dataset = datasets["train"]
 
-        # 데이터셋을 train, validation, test로 나누기
-        train_dataset, valid_dataset, test_dataset = split_salmonn_dataset(
-            train_dataset, val_ratio=0.2, test_ratio=0.5
-        )
+        if "valid" in datasets:
+            valid_dataset = datasets["valid"]
+        else:
+            train_size = int(0.8 * len(train_dataset))
+            valid_size = len(train_dataset) - train_size
 
-        # 별도로 train, validation, test 제이슨 파일이 확정 된 경우 위 로직 지우고
-        # 아래 주석 해제
-        # train_dataset = datasets["train"]
-        # valid_dataset = datasets["valid"]
-        # test_dataset = datasets["test"]
+            train_indices, valid_indices = random_split(
+                range(len(train_dataset)), [train_size, valid_size], generator=torch.Generator().manual_seed(self.seed)
+            )
+
+            valid_dataset = copy.deepcopy(train_dataset)
+            train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
+            valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
+
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
@@ -121,9 +126,6 @@ class DistllRunner:
         )
         self.valid_loader = get_dataloader(
             valid_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
-        )
-        self.test_loader = get_dataloader(
-            test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         )
 
         # scaler
