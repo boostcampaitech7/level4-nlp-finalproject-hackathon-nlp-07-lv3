@@ -62,7 +62,7 @@ class SALMONNDataset(Dataset):
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        audio_path = self.prefix + '/' + ann["path"]
+        audio_path = self.prefix + ann["path"]
         audio, sr = sf.read(audio_path)
         
         if len(audio.shape) == 2: # stereo to mono

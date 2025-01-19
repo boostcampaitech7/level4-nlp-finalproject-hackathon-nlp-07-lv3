@@ -52,7 +52,7 @@ def get_dataloader(dataset, config, is_train=True, use_distributed=True):
         sampler=sampler,
         shuffle=sampler is None and is_train,
         collate_fn=dataset.collater,
-        drop_last=is_train,
+        drop_last=is_train, # true이면 batch 사이즈보다 작은 나머지들은 그냥 버림
     )
 
     if is_train:

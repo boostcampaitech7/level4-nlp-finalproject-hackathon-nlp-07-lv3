@@ -43,36 +43,36 @@ class CustomDistiller(GeneralDistiller):
         self.dynamic_temperature= dynamic_temperature 
         self.projs = []
         self.projs_group = []
-        for im in self.d_config.intermediate_matches:
-            if im.proj is not None:
-                projection = im.proj[0]
-                dim_in = im.proj[1]
-                dim_out = im.proj[2]
-                self.projs_group.append(im.proj[3])
+        # for im in self.d_config.intermediate_matches:
+        #     if im.proj is not None:
+        #         projection = im.proj[0]
+        #         dim_in = im.proj[1]
+        #         dim_out = im.proj[2]
+        #         self.projs_group.append(im.proj[3])
 
-                '''
-                    /textbrewer/presets/PROJ_MAP 
-                    PROJ_MAP에 어떠한 projection이 가능한 다양한 레이어를 담아놓고 있음
-                    예를 들어 teacher 와 student 간의 Hidden Size가 차이가 나서 이를 차원에 맞게 수정이 필요하여 projection을 위해서 nn.Linear을 사용하면
-                    PROJ_MAP에 저장된 nn.Linear 방식을 사용해서 dim_in, dim_out을 활용해서 이를 선언
-                    PROJ_MAP은 외부에서 선언되어서 가져온 값으로 새로 선언해서 만들 혹은 수정의 필요가 있음
-                    여기서는 nn.Linear로 고정하되 추후에 projection 방법론 다양화에 따라서 따로 수정해서 진행 필요
+        #         '''
+        #             /textbrewer/presets/PROJ_MAP 
+        #             PROJ_MAP에 어떠한 projection이 가능한 다양한 레이어를 담아놓고 있음
+        #             예를 들어 teacher 와 student 간의 Hidden Size가 차이가 나서 이를 차원에 맞게 수정이 필요하여 projection을 위해서 nn.Linear을 사용하면
+        #             PROJ_MAP에 저장된 nn.Linear 방식을 사용해서 dim_in, dim_out을 활용해서 이를 선언
+        #             PROJ_MAP은 외부에서 선언되어서 가져온 값으로 새로 선언해서 만들 혹은 수정의 필요가 있음
+        #             여기서는 nn.Linear로 고정하되 추후에 projection 방법론 다양화에 따라서 따로 수정해서 진행 필요
                     
-                '''
+        #         '''
 
-                self.projs.append(nn.Linear(dim_in, dim_out))
-                self.projs[-1].to(self.t_config.device)
-            else:
-                self.projs.append(None)
-                self.projs_group.append(None)
+        #         self.projs.append(PROJ_MAP[projection](dim_in, dim_out))
+        #         self.projs[-1].to(self.t_config.device)
+        #     else:
+        #         self.projs.append(None)
+        #         self.projs_group.append(None)
 
         self.logits_projs=[]
         if  logits_pro is not None:
                 projection = logits_pro[0]
                 dim_in = logits_pro[1]
                 dim_out = logits_pro[2]
-                self.logits_projs.append(nn.Linear(dim_in, 4096))
-                self.logits_projs.append(nn.Linear(4096, dim_out))
+                self.logits_projs.append(PROJ_MAP[projection](dim_in, 4096))
+                self.logits_projs.append(PROJ_MAP[projection](4096, dim_out))
         for layer in self.logits_projs:
                 layer.to(self.t_config.device)
 
@@ -88,18 +88,12 @@ class CustomDistiller(GeneralDistiller):
             self.logger.addHandler(handler)
 
     def train_on_batch(self, batch, args=None):
-        '''
-            /textbrewer/distiller_utils/get_outputs_from_batch
+        args = args or {}
+        batch = move_to_device(batch, self.t_config.device)
+        results_T = self.model_T(batch)
+        results_S = self.model_S(batch)
+        teacher_batch = student_batch = batch
 
-            with torch.no_grad():
-                results_T = auto_forward(model_T,teacher_batch,args) -> results = model(*batch, **args)
-            
-            results_T의 결과는 cache로 저장되어있거나 없으면 직접 그 자리에서 출력을 받아옴 (model_T는 가중치가 고정)
-            
-        '''
-        (teacher_batch, results_T), (student_batch, results_S) = get_outputs_from_batch(batch, self.t_config.device,
-                                                                                        self.model_T, self.model_S,
-                                                                                        args)
         '''
             /textbrewer/distiller_utils/post_adaptor
 
@@ -112,7 +106,7 @@ class CustomDistiller(GeneralDistiller):
 
         '''
         results_T = post_adaptor(self.adaptor_T(teacher_batch, results_T))
-        results_S = post_adaptor(self.adaptor_S(student_batch,  results_S))
+        results_S = post_adaptor(self.adaptor_S(student_batch, results_S))
 
         total_loss, losses_dict = self.compute_loss(results_S, results_T, teacher_batch, student_batch)
 
@@ -179,6 +173,8 @@ class CustomDistiller(GeneralDistiller):
                     for logits_layer in self.logits_projs:
                         l_S = logits_layer(l_S)
 
+                    print(l_T.size())
+                    print(l_S.size())
                     if self.d_config.temperature_scheduler is not None:
                         temperature = self.d_config.temperature_scheduler(l_S, l_T, self.d_config.temperature)
                     else:

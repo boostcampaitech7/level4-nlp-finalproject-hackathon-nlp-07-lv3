@@ -1,0 +1,4 @@
+2025-01-20 03:50:47,450 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 11.76179313659668, 'unweighted_hard_label_loss': 7.3987321853637695}
+2025-01-20 04:14:34,574 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 11.761791229248047, 'unweighted_hard_label_loss': 7.388150691986084}
+2025-01-20 04:20:21,161 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 11.76179313659668, 'unweighted_hard_label_loss': 7.3987321853637695}
+2025-01-20 04:37:48,514 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 11.761792182922363, 'unweighted_hard_label_loss': 7.388150691986084}

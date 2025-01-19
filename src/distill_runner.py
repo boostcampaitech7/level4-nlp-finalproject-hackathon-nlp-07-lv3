@@ -1,5 +1,5 @@
 # This script is based on https://github.com/salesforce/LAVIS/blob/main/lavis/runners/runner_base.py
-
+import copy
 import datetime
 import glob
 import json
@@ -7,11 +7,13 @@ import logging
 import os
 import time
 from pathlib import Path
+from tqdm import tqdm
 
 import torch
 import torch.distributed as dist
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import random_split
 
 import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
@@ -46,8 +48,8 @@ class DistillRunner:
         self.cuda_enabled = self.device.type == "cuda"
 
         # test prompt
-        self.prompt_template = self.config.config.model.get("prompt_template", "")
-        test_prompt_path = self.config.config.model.get("test_prompt_path", "")
+        self.prompt_template = self.config.config.model_S.get("prompt_template", "")
+        test_prompt_path = self.config.config.model_S.get("test_prompt_path", "")
         if test_prompt_path:
             try:
                 with open(test_prompt_path, "r") as f:
@@ -96,7 +98,7 @@ class DistillRunner:
                             model_S=model_S, 
                             adaptor_T=simple_adaptor, 
                             adaptor_S=simple_adaptor,
-                            logits_pro=['linear',model_T.llama_tokenizer.voca_size,model_S.llama_tokenizer.voca_size],
+                            logits_pro=['linear',model_S.llama_model.get_input_embeddings().num_embeddings,model_T.llama_model.get_input_embeddings().num_embeddings],
                             global_step_start=0,
                             use_softmax=True,
                             dt_normalization_type='softmax',
@@ -119,7 +121,6 @@ class DistillRunner:
             train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
             valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
 
-
         # 데이터로더 생성
         self.train_loader = get_dataloader(
             train_dataset, self.config.config.run, is_train=True, use_distributed=self.use_distributed
@@ -139,6 +140,7 @@ class DistillRunner:
         self.iters_per_epoch = (
             len(self.train_loader) if self.config.config.run.epoch_based else self.config.config.run.iters_per_epoch
         )
+        assert self.iters_per_epoch > 0,"train_laoder is empty. Make sure get datasets properly"
         self.optimizer = get_optimizer(self.model_S, self.config.config.run.optims)
         self.scheduler = LinearWarmupCosineLRScheduler(
             self.optimizer,
@@ -159,8 +161,8 @@ class DistillRunner:
             return model
 
     def train_epoch(self, epoch):
-        self.model_T.eval()
-        self.model_S.train()
+        # self.model_T.eval()
+        # self.model_S.train()
 
         metric_logger = MetricLogger(delimiter="  ")
         metric_logger.add_meter("lr", SmoothedValue(window_size=1, fmt="{value:.6f}"))
@@ -357,7 +359,7 @@ class DistillRunner:
         best_agg_metric = 0
         best_epoch = 0
 
-        for cur_epoch in range(self.start_epoch, self.max_epoch):
+        for cur_epoch in tqdm(range(self.start_epoch, self.max_epoch), desc="[Training]", total=len(range(self.start_epoch, self.max_epoch))):
             if self.evaluate_only:
                 break
 

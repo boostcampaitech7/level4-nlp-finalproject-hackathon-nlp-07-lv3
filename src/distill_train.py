@@ -76,6 +76,18 @@ def main():
     # load config
     args = parse_args()
     cfg = DistillConfig(args)
+
+    # stage1, stage2 각각의 optim과 output_dir을 따로 담아두고 나중에 넣어줌
+    optims_1 = cfg.config.run.optims.optims_1
+    output_dir_1 = cfg.config.run.output_dir.stage1_output_dir
+    optims_2 = cfg.config.run.optims.optims_2
+    output_dir_2 = cfg.config.run.output_dir.stage2_output_dir
+
+    # stage1 optim 설정으로 바꾸기
+    cfg.config.run.optims = optims_1
+    cfg.config.run.output_dir = output_dir_1
+
+
     run_config = cfg.config.run
     model_T_config = cfg.config.model_T
     model_S_config = cfg.config.model_S
