@@ -30,6 +30,7 @@ from models import load_model
 from runner import Runner
 from utils import setup_logger
 
+from nemo.collections.asr.models import EncDecMultiTaskModel
 
 def now():
     seoul_tz = pytz.timezone("Asia/Seoul")
@@ -85,6 +86,7 @@ def main():
 
     run_config = cfg.config.run
     model_config = cfg.config.model
+    canary_config = cfg.config.canary
     data_config = cfg.config.datasets
     wandb_config = cfg.config.wandb
 
@@ -125,9 +127,11 @@ def main():
             "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
         }
 
+    n_model = EncDecMultiTaskModel.from_pretrained(canary_config.model_name)
+
     # build model
     if not args.dryrun:
-        model = load_model(model_config)
+        model = load_model(n_model, model_config)
     else:  # load small dummy language model
         from transformers import AutoModelForCausalLM
 

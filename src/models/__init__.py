@@ -15,5 +15,5 @@
 from .salmonn import SALMONN
 
 
-def load_model(config):
-    return SALMONN.from_config(config)
+def load_model(n_model, config):
+    return SALMONN.from_config(n_model, config)

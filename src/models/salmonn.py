@@ -113,6 +113,7 @@ class SALMONN(nn.Module):
         device_8bit=0,  # the device of 8bit model should be set when loading and cannot be changed anymore.
         token=None,
         only_preprocessor=None,
+        n_model=None,
     ):
         super().__init__()
 
@@ -169,14 +170,21 @@ class SALMONN(nn.Module):
                 self.llama_model.print_trainable_parameters()
                 logging.info("LoRA Training")
 
-        assert whisper_path
-        logging.info("Loading Whisper Model")
+        # assert whisper_path
+        # logging.info("Loading Whisper Model")
+        
+        assert n_model
+        logging.info("Loading Canary Model")
 
         # speech model
-        self.speech_encoder = WhisperModel.from_pretrained(whisper_path).encoder
+        #self.speech_encoder = WhisperModel.from_pretrained(whisper_path).encoder
+        self.speech_encoder = n_model
+        self.conformer = self.speech_encoder.encoder
+        self.d_model = self.conformer.d_model
+        # n_layernorm = conformer.d_model
 
         # speech
-        self.ln_speech = nn.LayerNorm(self.speech_encoder.config.d_model)
+        self.ln_speech = nn.LayerNorm(self.d_model)
         if freeze_whisper:
             for name, param in self.speech_encoder.named_parameters():
                 param.requires_grad = False
@@ -204,11 +212,11 @@ class SALMONN(nn.Module):
             if self.beats_path:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
                     num_query_token=num_speech_query_token,
-                    speech_width=self.speech_encoder.config.d_model + self.beats.cfg.encoder_embed_dim,
+                    speech_width=self.d_model + self.beats.cfg.encoder_embed_dim,
                 )
             else:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
-                    num_query_token=num_speech_query_token, speech_width=self.speech_encoder.config.d_model
+                    num_query_token=num_speech_query_token, speech_width=self.d_model
                 )
             self.speech_Qformer.bert.embeddings.word_embeddings = None
             self.speech_Qformer.bert.embeddings.position_embeddings = None
@@ -614,7 +622,7 @@ class SALMONN(nn.Module):
         return text
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, n_model, config):
         llama_path = config.get("llama_path")
         whisper_path = config.get("whisper_path")
         freeze_whisper = config.get("freeze_whisper", True)
@@ -674,6 +682,7 @@ class SALMONN(nn.Module):
             device_8bit=device_8bit,
             token=token,
             only_preprocessor=only_preprocessor,
+            n_model = n_model,
         )
 
         ckpt_path = config.get("ckpt", "")

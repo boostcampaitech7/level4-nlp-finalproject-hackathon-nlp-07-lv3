@@ -2,12 +2,10 @@ import os
 from typing import Any, Iterable, List, Optional, Union
 from dataclasses import dataclass, fields, is_dataclass
 
-from omegaconf import OmegaConf, DictConfig
-from nemo.collections.asr.models import EncDecMultiTaskModel
-from nemo.collections.asr.modules.audio_preprocessing import AudioToMelSpectrogramPreprocessor
-from nemo.collections.asr.parts.utils.speaker_utils import embedding_normalize
 import torch
 from tqdm import  tqdm
+from omegaconf import OmegaConf, DictConfig
+from nemo.collections.asr.models import EncDecMultiTaskModel
 
 try:
     from torch.cuda.amp import autocast
