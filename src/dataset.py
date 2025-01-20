@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import os
 
 import librosa
 import numpy as np
@@ -27,10 +28,15 @@ class SALMONNDataset(Dataset):
     def __init__(self, prefix, ann_path, whisper_path):
         super().__init__()
 
+        # 경로 검증: 절대 경로인지 확인
+        if not os.path.isabs(prefix):
+            raise ValueError(
+                f"Provided prefix path '{prefix}' is not an absolute path. "
+                "Please provide an absolute path to the dataset. fix run.prefix which is in configs/train.yaml"
+            )
+
         self.prefix = prefix
-
         self.annotation = json.load(open(ann_path, "r"))["annotation"]
-
         self.wav_processor = WhisperFeatureExtractor.from_pretrained(whisper_path)
 
     def __len__(self):

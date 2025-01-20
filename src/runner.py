@@ -1,5 +1,6 @@
 # This script is based on https://github.com/salesforce/LAVIS/blob/main/lavis/runners/runner_base.py
-
+import subprocess
+import sys
 import copy
 import datetime
 import glob
@@ -431,3 +432,7 @@ class Runner:
                 logging.info(f"Removed old checkpoint {oldest_checkpoint}.")
 
         return save_to
+
+
+if __name__ == "__main__":
+    subprocess.run([f'{sys.executable}', "train.py", "--cfg-path", "./configs/train.yaml"])
