@@ -10,7 +10,7 @@ model:
   # paths
   llama_path: "meta-llama/Llama-3.2-3B-Instruct"
   whisper_path: "openai/whisper-large-v2"
-  beats_path: "/home/servingnaverboost/base_line/base_code/temp_storage/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로 
+  beats_path: "/data/data_storage/sample_model/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로 
 
   token: ""           # 개인 huggingface 키 입력
 
@@ -42,17 +42,15 @@ model:
   prompt_path: "prompts/train_prompt.json"
   test_prompt_path: "prompts/test_prompt.json"
   max_txt_len: 300
-  end_sym: "<|eot_id|>"   # LLM 모델에 맞춰 바꿀 것
+  end_sym: "<|end_of_text|>"   # LLM 모델에 맞춰 바꿀 것
 
 datasets:
-  prefix: "./data"  
+  prefix: "../../../../data_storage"  
   
-  train_ann_path_1: "./data/stage1_train.json"  
-  valid_ann_path_1: "./data/stage1_valid.json"  
-  test_ann_path_1: "./data/stage1_test.json"    
-  train_ann_path_2: "./data/stage2_train.json"  
-  valid_ann_path_2: "./data/stage2_valid.json"  
-  test_ann_path_2: "./data/stage2_test.json"  
+  train_ann_path_1: "./data/filtered_stage1_train.json"  
+  valid_ann_path_1: "" 
+  train_ann_path_2: "./data/filtered_stage2_train.json"  
+  valid_ann_path_2: ""
 
   whisper_path: "openai/whisper-large-v2"
 
@@ -62,20 +60,20 @@ run:
   evaluate: False # if True, only evaluate model on test data
   # exp_name: "llama-3.2-1B-1percent-stage1" # 코드 전체에서 exp_name이라는 변수 또는 string이 보이지 않음
 
-  log_freq: 1            # 원래 5
+  log_freq: 5            # 원래 5
 
   # 에퐄 및 배치 관련 설정
-  epoch_based: True
-  iters_per_epoch: 5     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
+  epoch_based: True        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
+  iters_per_epoch: 3000     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
   accum_grad_iters: 1
-  batch_size_train: 2    # 원래 8 
-  batch_size_eval: 2     # 원래 8
-  num_workers: 0         # 원래 8
+  batch_size_train: 16    # 원래 8 
+  batch_size_eval: 16     # 원래 8
+  num_workers: 8         # 원래 8
 
   device: "cuda"
   use_distributed: False # 원래 True(분산 환경에서는 True 맞음)
   amp: True
-  world_size: 1          # 원래 2
+  world_size: 2          # 원래 2
   dist_url: "env://"
 
   output_dir:
@@ -85,16 +83,16 @@ run:
   # optimizer & scheduler
   optims:
     optims_1:
-      max_epoch: 3        # 원래 30
-      warmup_steps: 10     # 원래 3000
+      max_epoch: 1        # 원래 30
+      warmup_steps: 2500     # 원래 3000
       warmup_start_lr: 1e-6
       init_lr: 3e-5
       min_lr: 1e-5
       weight_decay: 0.05
       beta2: 0.999
     optims_2:
-      max_epoch: 5        # 원래 30
-      warmup_steps: 10     # 원래 3000
+      max_epoch: 1        # 원래 30
+      warmup_steps: 2500     # 원래 3000
       warmup_start_lr: 1e-6
       init_lr: 3e-5
       min_lr: 1e-5

@@ -11,20 +11,15 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from transformers import DynamicCache
-
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
 from transformers import WhisperFeatureExtractor
 
-
-# From trainer
-sys.path.append(str(Path().parent / "audiolm-trainer"))
 from config import Config
 from dataset import SALMONNDataset
 from models.salmonn import SALMONN
 from utils import get_dataloader, prepare_sample
 
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def load_model(salmonn_preprocessor):
     model = salmonn_preprocessor.llama_model

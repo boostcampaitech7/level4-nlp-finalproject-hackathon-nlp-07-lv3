@@ -14,19 +14,9 @@
 - requirements.txt 설치
 등등
 
-6. src/data 안에 데이터셋 + 파싱해주는 json 전부 넣어두기
-- stage(1,2) train.json의 경우 샘플로 넣어둔 것
-- 아래 json 전부 있는 것을 가정한 코드
-
-  ![image](https://github.com/user-attachments/assets/b0ff51a2-d00f-4973-be2f-655bdb292cf2)
-
-
----
-- sample dataset(6G)과 NOTA측에서 제공한 기본 모델은 아래 경로에 올려뒀습니다.
-  - https://drive.google.com/drive/u/0/folders/1WppT1b4goghsOI8BXZBCldordnO_M-cd
-
-- json 파일은 아래 데이터셋 참고할 것
-  - https://huggingface.co/datasets/lifelongeeek/salmonn_dataset_annotation
+6. src/data 안에 데이터 파싱해주는 json 넣어두기
+- json 파일은 경로 존재하지 않는 부분 제거한 구글 드라이브 참고할 것 (링크된 이슈 참고)
+  - https://github.com/boostcampaitech7/level4-nlp-finalproject-hackathon-nlp-07-lv3/issues/14
 
 ---
 
@@ -40,27 +30,18 @@
 
 # 3. evaluate
 - `eval_config.yaml`에서 stage2 마친 가중치 가져와서 경로 설정해주고
-- `datasets`에서 `test_ann_path` 에 `/data/test_asr.json` 또는 `/data/test_aac.json` 설정해준 뒤에
+- 자신의 모델에 맞게 기타 config 설정 완료해준 뒤에
 - `src` 폴더 경로 들어와서 아래와 같이 실행
-`python3 evaluate.py --cfg-path configs/eval_config.yaml --skip_scoring`
+  - aac 제출용 `python3 evaluate.py --cfg-path configs/eval_config.yaml --mode submission_aac`
+  - asr 제출용 `python3 evaluate.py --cfg-path configs/eval_config.yaml --mode submission_asr`
 
 - 최종적으로 submission.csv 생성된 것 확인
 
-### evaluate 관련 에러노트
-`python3 evaluate.py --cfg-path configs/eval_config.yaml` 실행하면
-아래와 같이 에러 발생
-```
-level4-nlp-finalproject-hackathon-nlp-07-lv3/src/evaluate.py", line 112, in main
-ref = samples["text"]
-KeyError: 'text'
-```
+# 4. evaluate_efficiency
+`python3 evaluate_efficiency_salmonn.py --cfg-path configs/eval_config.yaml`
 
-`python3 evaluate.py --cfg-path configs/eval_config.yaml --task asr(또는 aac)` 실행하면
-아래와 같이 에러발생
-```
-level4-nlp-finalproject-hackathon-nlp-07-lv3/src/salmonn_utils.py", line 115, in __getitem__
-entity["text"] = ann["text"]
-KeyError: 'text'
-```
+---
 
- 
+## 분산환경 학습
+- train.yaml 파일에 `use_distributed: True` 체크하고
+`torchrun --nproc_per_node=2 train.py --cfg-path configs/train.yaml `

@@ -63,28 +63,11 @@ class SALMONNDataset(Dataset):
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        cwd = Path.cwd()
-        audio_path = cwd / 'src' / 'data' / ann["path"].lstrip("/") if "/" in ann["path"] else cwd / 'src' / 'data' / ann["path"]
-        try:
-            audio, sr = sf.read(audio_path)
-        except (IOError, sf.SoundFileError) as e:
-            print(f"Failed to load {audio_path}: {e}. Loading 0-th sample instead.")
-            try:
-                audio, sr = sf.read(self.prefix + self.annotation[0]["path"])
-            except (IOError, sf.SoundFileError) as e:
-                print(f"Failed to load 0-th sample as well: {e}. Returning empty audio.")
-                audio, sr = np.array([]), 44100  # 빈 오디오와 기본 샘플레이트 반환
-
-        if len(audio.shape) == 2:  # stereo to mono
+        audio_path = self.prefix + '/' + ann["path"]
+        audio, sr = sf.read(audio_path)
+        
+        if len(audio.shape) == 2: # stereo to mono
             audio = audio[:, 0]
-
-        # if "expand_wav" in ann:
-        # for p in ann["expand_wav"]:
-        # expand_audio, _ = sf.read(self.prefix + '/' + p)
-        # if len(expand_audio.shape) == 2:
-        # expand_audio = expand_audio[:, 0]
-        # sil = np.zeros(int(sr/10), dtype=float)
-        # audio = np.concatenate((audio, sil, expand_audio), axis=0)
 
         if len(audio) < sr:  # pad audio to at least 1s
             sil = np.zeros(sr - len(audio), dtype=float)

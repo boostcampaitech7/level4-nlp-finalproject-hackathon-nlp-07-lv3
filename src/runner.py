@@ -1,5 +1,6 @@
 # This script is based on https://github.com/salesforce/LAVIS/blob/main/lavis/runners/runner_base.py
 
+import copy
 import datetime
 import glob
 import json
@@ -12,6 +13,7 @@ import torch
 import torch.distributed as dist
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import random_split
 
 import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
@@ -21,7 +23,10 @@ from utils import get_dataloader, prepare_sample
 
 
 class Runner:
-    def __init__(self, cfg, model, datasets, job_id, dryrun):
+    def __init__(self, cfg, model, datasets, job_id, dryrun, SEED):
+        # SEED 설정
+        self.seed = SEED
+
         self.config = cfg
 
         # dryrun (test with dummy model)
@@ -77,8 +82,23 @@ class Runner:
             self.model = self._model
 
         train_dataset = datasets["train"]
-        valid_dataset = datasets["valid"]
-        test_dataset = datasets["test"]
+
+        # valid가 있는 경우와 없는 경우 나눠서 데이터셋 생성
+        train_dataset = datasets["train"]
+
+        if "valid" in datasets:
+            valid_dataset = datasets["valid"]
+        else:
+            train_size = int(0.8 * len(train_dataset))
+            valid_size = len(train_dataset) - train_size
+
+            train_indices, valid_indices = random_split(
+                range(len(train_dataset)), [train_size, valid_size], generator=torch.Generator().manual_seed(self.seed)
+            )
+
+            valid_dataset = copy.deepcopy(train_dataset)
+            train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
+            valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
@@ -86,9 +106,6 @@ class Runner:
         )
         self.valid_loader = get_dataloader(
             valid_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
-        )
-        self.test_loader = get_dataloader(
-            test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         )
 
         # scaler

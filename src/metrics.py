@@ -9,6 +9,7 @@ from typing import Any, Callable, Iterator, List, Mapping, Match, Optional, Unio
 import editdistance as ed
 import numpy as np
 import torch
+from aac_metrics.functional.spider import spider
 from more_itertools import windowed
 from torch import Tensor
 
@@ -932,8 +933,6 @@ class ParticipantVisibleError(Exception):
 
 def compute_spider(hyps, refs) -> float:
     refs = [[ref_] for ref_ in refs]  # need to be List[List[str]]
-
-    corpus_score, _ = cider_d(hyps, refs)
-
-    spider = float(f"{corpus_score['cider_d'].item()*100.0:.4f}")
-    print(f"SPIDEr: {spider}")
+    spider_result = spider(candidates=hyps, mult_references=refs)
+    spider_score = round(float(spider_result[0]["spider"]), 4)
+    print(f"SPIDEr: {spider_score}")

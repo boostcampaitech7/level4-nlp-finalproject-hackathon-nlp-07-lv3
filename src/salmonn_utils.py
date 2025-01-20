@@ -1,6 +1,5 @@
 import json
-import sys
-from pathlib import Path
+import os
 
 import librosa
 import numpy as np
@@ -9,10 +8,6 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from transformers import WhisperFeatureExtractor
-
-
-# Add custom module path
-sys.path.append(str(Path(__file__).parent / "audiolm-trainer"))
 
 # Custom modules
 from models.salmonn import SALMONN
@@ -70,21 +65,26 @@ class SALMONNTestDataset(Dataset):
             "id": id,
         }
 
+        # evaluate의 경우에는 text가 없으므로 없는 경우 pass 그외에는 전부 있음
         if self.task is not None:
-            entity["text"] = [s["text"] for s in samples]
+            try:
+                entity["text"] = [s["text"] for s in samples]
+
+            except KeyError:
+                pass
+
+
 
         return entity
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        cwd = Path.cwd()
-        audio_path = cwd / 'src' / 'data' / ann["path"].lstrip("/") if "/" in ann["path"] else cwd / 'src' / 'data' / ann["path"]
-
+        audio_path = os.path.join(self.prefix, ann["path"])
         try:
             audio, sr = sf.read(audio_path)
         except (RuntimeError, IOError) as e:
             print(f"Failed to load {audio_path}. Error: {e}. Loading 0-th sample instead.")
-            audio, sr = sf.read(self.prefix + "/" + self.annotation[0]["path"])
+            audio, sr = sf.read(os.path.join(self.prefix, self.annotation[0]["path"]))
 
         if len(audio.shape) == 2:  # stereo to mono
             audio = audio[:, 0]
@@ -113,7 +113,12 @@ class SALMONNTestDataset(Dataset):
             "id": ann["path"],
         }
 
+        # evaluate의 경우에는 text가 없으므로 없는 경우 pass 그외에는 전부 있음
         if self.task is not None:
-            entity["text"] = ann["text"]
+            try:
+                entity["text"] = ann["text"]
+
+            except KeyError:
+                pass
 
         return entity
