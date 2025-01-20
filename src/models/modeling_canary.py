@@ -15,9 +15,6 @@ except ImportError:
     @contextmanager
     def autocast(enabled=None):
         yield
-import numpy as np
-import json
-import pickle as pkl
 
 @dataclass
 class InternalTranscribeConfig:
@@ -128,12 +125,12 @@ def get_embeddings(speaker_model : EncDecMultiTaskModel, manifest_file, batch_si
 
     return speech_embeds
 
-manifest_filepath = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')
-device = 'cuda'
-# load model
-canary_model = EncDecMultiTaskModel.from_pretrained('nvidia/canary-1b')
+# manifest_filepath = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')
+# device = 'cuda'
+# # load model
+# canary_model = EncDecMultiTaskModel.from_pretrained('nvidia/canary-1b')
 
-get_embeddings(canary_model, manifest_filepath, batch_size=2, embedding_dir='./', device=device)
+# get_embeddings(canary_model, manifest_filepath, batch_size=2, embedding_dir='./', device=device)
 
 # update dcode params
 # decode_cfg = canary_model.cfg.decoding

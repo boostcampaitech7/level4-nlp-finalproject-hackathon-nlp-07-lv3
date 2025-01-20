@@ -31,6 +31,7 @@ from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub
 from torch.profiler import profile, ProfilerActivity
+from nemo.collections.asr.models import EncDecMultiTaskModel
 
 current_dir = os.getcwd()
 current_time = time.strftime("%Y%m%d_%H%M", time.localtime())
@@ -113,7 +114,7 @@ class SALMONN(nn.Module):
         device_8bit=0,  # the device of 8bit model should be set when loading and cannot be changed anymore.
         token=None,
         only_preprocessor=None,
-        n_model=None,
+        canary_path="",
     ):
         super().__init__()
 
@@ -172,13 +173,14 @@ class SALMONN(nn.Module):
 
         # assert whisper_path
         # logging.info("Loading Whisper Model")
+        # self.speech_encoder = WhisperModel.from_pretrained(whisper_path).encoder
         
-        assert n_model
+        
+        # canary model
+        assert canary_path
         logging.info("Loading Canary Model")
 
-        # speech model
-        #self.speech_encoder = WhisperModel.from_pretrained(whisper_path).encoder
-        self.speech_encoder = n_model
+        self.speech_encoder = EncDecMultiTaskModel.from_pretrained(canary_path, map_location=torch.device("cuda:1" if torch.cuda.is_available() else "cpu"))
         self.conformer = self.speech_encoder.encoder
         self.d_model = self.conformer.d_model
         # n_layernorm = conformer.d_model
@@ -442,7 +444,7 @@ class SALMONN(nn.Module):
         else:
             return embeds, atts
 
-    def forward(self, samples, verbose=False, profile_flag=False):
+    def forward(self, samples, n_samples, verbose=False, profile_flag=False):
         self.profile_flag = profile_flag
 
         # detect whether there are multi tasks in this batch
@@ -622,12 +624,13 @@ class SALMONN(nn.Module):
         return text
 
     @classmethod
-    def from_config(cls, n_model, config):
+    def from_config(cls, config):
         llama_path = config.get("llama_path")
         whisper_path = config.get("whisper_path")
         freeze_whisper = config.get("freeze_whisper", True)
         beats_path = config.get("beats_path", "")
         freeze_beats = config.get("freeze_beats", True)
+        canary_path = config.get("canary_path")
 
         use_speech_Qformer = config.get("use_speech_Qformer", True)
         num_speech_query_token = config.get("num_speech_query_token", 1)
@@ -682,7 +685,8 @@ class SALMONN(nn.Module):
             device_8bit=device_8bit,
             token=token,
             only_preprocessor=only_preprocessor,
-            n_model = n_model,
+            
+            canary_path=canary_path,
         )
 
         ckpt_path = config.get("ckpt", "")

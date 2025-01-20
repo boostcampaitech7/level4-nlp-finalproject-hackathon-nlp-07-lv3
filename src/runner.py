@@ -38,7 +38,8 @@ class Runner:
         self.log_writter = SummaryWriter(self.output_dir)
 
         # settings
-        self.device = torch.device(self.config.config.run.device)
+        #self.device = torch.device(self.config.config.run.device)
+        self.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
         self.use_distributed = self.config.config.run.use_distributed
         self.start_epoch = 0
         self.max_epoch = self.config.config.run.optims.max_epoch
@@ -84,7 +85,7 @@ class Runner:
 
         train_dataset = datasets["train"]
         
-        if "valid" in datasets:
+        if "valid" in datasets.keys():
             valid_dataset = datasets["valid"]
         else:
             train_size = int(0.8 * len(train_dataset))

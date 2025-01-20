@@ -30,7 +30,6 @@ from models import load_model
 from runner import Runner
 from utils import setup_logger
 
-from nemo.collections.asr.models import EncDecMultiTaskModel
 
 def now():
     seoul_tz = pytz.timezone("Asia/Seoul")
@@ -86,7 +85,6 @@ def main():
 
     run_config = cfg.config.run
     model_config = cfg.config.model
-    canary_config = cfg.config.canary
     data_config = cfg.config.datasets
     wandb_config = cfg.config.wandb
 
@@ -112,7 +110,7 @@ def main():
     print(f"Global rank: {global_rank}")
 
     # print config
-    cfg.pretty_print()
+    #cfg.pretty_print()
 
     # build stage1 datasets
     # 별도로 valid 지정 없는 경우 train만 생성 후 split
@@ -127,11 +125,10 @@ def main():
             "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
         }
 
-    n_model = EncDecMultiTaskModel.from_pretrained(canary_config.model_name)
 
     # build model
     if not args.dryrun:
-        model = load_model(n_model, model_config)
+        model = load_model(model_config)
     else:  # load small dummy language model
         from transformers import AutoModelForCausalLM
 
@@ -165,7 +162,7 @@ def main():
     cfg.config.model.ckpt = ckpt_path
 
     # print config
-    cfg.pretty_print()
+    #cfg.pretty_print()
 
     # Wandb setup, stage2 wandb 시작
     if wandb_config.log:
