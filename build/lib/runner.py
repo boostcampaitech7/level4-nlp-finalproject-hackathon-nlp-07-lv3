@@ -1,6 +1,5 @@
 # This script is based on https://github.com/salesforce/LAVIS/blob/main/lavis/runners/runner_base.py
 
-import copy
 import datetime
 import glob
 import json
@@ -13,19 +12,16 @@ import torch
 import torch.distributed as dist
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import random_split
 
 import wandb
 from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, is_main_process, main_process
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
-from models.modeling_canary import get_dataloader_from_config, get_transcribe_config
 
-manifest_file_path = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')
 
 class Runner:
-    def __init__(self, cfg, model, n_model, datasets, job_id, dryrun):
+    def __init__(self, cfg, model, datasets, job_id, dryrun):
         self.config = cfg
 
         # dryrun (test with dummy model)
@@ -74,32 +70,15 @@ class Runner:
 
         # model
         self._model = model
-        self.n_model = n_model
-        
         self._model.to(self.device)
-        self.n_model.to(self.device)
-        
-        # if self.use_distributed:
-        #     self.model = DDP(self._model, device_ids=[self.config.config.run.gpu])
-        # else:
-        #     self.model = self._model
-
-        # valid가 있는 경우와 없는 경우 나눠서 데이터셋 생성
-        train_dataset = datasets["train"]
-
-        if "valid" in datasets:
-            valid_dataset = datasets["valid"]
+        if self.use_distributed:
+            self.model = DDP(self._model, device_ids=[self.config.config.run.gpu])
         else:
-            train_size = int(0.8 * len(train_dataset))
-            valid_size = len(train_dataset) - train_size
+            self.model = self._model
 
-            train_indices, valid_indices = random_split(
-                range(len(train_dataset)), [train_size, valid_size], generator=torch.Generator().manual_seed(self.seed)
-            )
-
-            valid_dataset = copy.deepcopy(train_dataset)
-            train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
-            valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
+        train_dataset = datasets["train"]
+        valid_dataset = datasets["valid"]
+        test_dataset = datasets["test"]
 
         # 데이터로더 생성
         self.train_loader = get_dataloader(
@@ -162,8 +141,6 @@ class Runner:
             if i >= self.iters_per_epoch:
                 break
 
-            n_samples = next(self.n_loader)
-
             samples = next(self.train_loader)
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
 
@@ -172,7 +149,7 @@ class Runner:
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     profile_flag = True if i == 0 and profile_flag else False
-                    loss = self.model(samples, n_samples, self.n_transcribe_cfg, profile_flag=profile_flag)["loss"]
+                    loss = self.model(samples, profile_flag=profile_flag)["loss"]
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
