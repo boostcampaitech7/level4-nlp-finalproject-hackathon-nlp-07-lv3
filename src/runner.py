@@ -83,12 +83,12 @@ class Runner:
 
         train_dataset = datasets["train"]
 
-        # valid가 있는 경우와 없는 경우 나눠서 데이터셋 생성
-        train_dataset = datasets["train"]
-
-        if "valid" in datasets:
+        # valid 있는 경우와 없는 경우로 나누어서 데이터셋 생성
+        if "valid" in datasets.keys():
+            print("valid가 있습니다.")
             valid_dataset = datasets["valid"]
         else:
+            print("valid가 없으므로 train에서 8:2 비율로 생성합니다.")
             train_size = int(0.8 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
 
