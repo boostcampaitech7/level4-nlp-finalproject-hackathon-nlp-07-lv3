@@ -18,12 +18,10 @@ from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, 
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
-from models.modeling_canary import get_dataloader_from_config, get_transcribe_config
 
-manifest_file_path = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')
 
 class Runner:
-    def __init__(self, cfg, model, n_model, datasets, job_id, dryrun):
+    def __init__(self, cfg, model, datasets, job_id, dryrun):
         self.config = cfg
 
         # dryrun (test with dummy model)
@@ -72,15 +70,11 @@ class Runner:
 
         # model
         self._model = model
-        self.n_model = n_model
-        
         self._model.to(self.device)
-        self.n_model.to(self.device)
-        
-        # if self.use_distributed:
-        #     self.model = DDP(self._model, device_ids=[self.config.config.run.gpu])
-        # else:
-        #     self.model = self._model
+        if self.use_distributed:
+            self.model = DDP(self._model, device_ids=[self.config.config.run.gpu])
+        else:
+            self.model = self._model
 
         train_dataset = datasets["train"]
         valid_dataset = datasets["valid"]
@@ -96,13 +90,7 @@ class Runner:
         self.test_loader = get_dataloader(
             test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         )
-        
-        config, self.n_loader = get_dataloader_from_config(self.n_model, manifest_file_path)
-        self.n_model._update_dataset_config(dataset_name='test', config=config)
-        self.n_model._test_dl = self.n_loader
-        
-        self.n_transcribe_cfg = get_transcribe_config()
-        
+
         # scaler
         self.use_amp = self.config.config.run.get("amp", False)
         if self.use_amp:
@@ -153,8 +141,6 @@ class Runner:
             if i >= self.iters_per_epoch:
                 break
 
-            n_samples = next(self.n_loader)
-
             samples = next(self.train_loader)
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
 
@@ -163,7 +149,7 @@ class Runner:
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     profile_flag = True if i == 0 and profile_flag else False
-                    loss = self.model(samples, n_samples, self.n_transcribe_cfg, profile_flag=profile_flag)["loss"]
+                    loss = self.model(samples, profile_flag=profile_flag)["loss"]
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
