@@ -18,7 +18,7 @@ pre-commit==3.8.0
 more-itertools==10.5.0
 aac-metrics==0.5.4
 
-# For LLM-Pruner
+# For distillation & LLM-Pruner
 numexpr
 textbrewer
 datasets
@@ -28,6 +28,7 @@ rouge-score>=0.0.4
 jsonlines
 scikit-learn>=0.24.1
 sqlitedict
+safetensors
 
 # For lm-evaluation-harness
 importlib-resources

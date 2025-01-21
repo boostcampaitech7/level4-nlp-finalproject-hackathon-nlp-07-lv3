@@ -23,9 +23,11 @@ from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
 
 class DistillRunner:
-    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED):
+    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED, teacher_output_dir:str=""):
         self.seed = SEED
         self.config = cfg
+        self.model_config = cfg.config.model_T
+        self.data_config = cfg.config.datasets
 
         # dryrun (test with dummy model)
         self.dryrun = dryrun
@@ -34,6 +36,12 @@ class DistillRunner:
         self.output_dir = Path(self.config.config.run.output_dir) / job_id
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.log_writter = SummaryWriter(self.output_dir)
+
+        # path
+        self.lm_path = self.model_config.llama_path.replace("/", "-")
+        self.stage_path = self.data_config.train_ann_path_2.split("/")[-1].split(".")[0]
+        self.teacher_output_dir = teacher_output_dir
+        self.teacher_output_path = os.path.join(self.teacher_output_dir, self.lm_path, self.stage_path) 
 
         # settings
         self.device = torch.device(self.config.config.run.device)
@@ -81,12 +89,15 @@ class DistillRunner:
             self.model_S = self._model_S
         
         # model_T
-        self._model_T = model_T
-        self._model_T.to(self.device2)
-        if self.use_distributed:
-            self.model_T = DDP(self._model_T)
+        if model_T is not None:
+            self._model_T = model_T
+            self._model_T.to(self.device2)
+            if self.use_distributed:
+                self.model_T = DDP(self._model_T)
+            else:
+                self.model_T = model_T
         else:
-            self.model_T = self._model_T
+            self.model_T = None
 
         self.distiller = distiller
                             
@@ -146,8 +157,9 @@ class DistillRunner:
         else:
             return model
 
-    def train_epoch(self, epoch):
-        self.model_T.eval()
+    def train_epoch(self, epoch, total_cnt):
+        if self.model_T is not None:
+            self.model_T.eval()
         self.model_S.train()
 
         metric_logger = MetricLogger(delimiter="  ")
@@ -166,17 +178,26 @@ class DistillRunner:
         ):
             if i >= self.iters_per_epoch:
                 break
-
-            samples_S = next(self.train_loader)
-            samples_T = copy.deepcopy(samples_S)
-            samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
-            samples_T = prepare_sample(samples_T, cuda_enabled=self.cuda_enabled, device=self.device2)
-
+            
+            if self.model_T is not None:
+                samples_S = next(self.train_loader)
+                samples_T = copy.deepcopy(samples_S)
+                samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
+                samples_T = prepare_sample(samples_T, cuda_enabled=self.cuda_enabled, device=self.device2)
+            else:
+                samples_S = next(self.train_loader)
+                samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
+                samples_T = None
+            
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
-                    loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
+                    if self.model_T is not None:
+                        loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
+                    else:
+                        teacher_output_path = os.path.join(self.teacher_output_path, f"{self.lm_path}_{self.stage_path}_{total_cnt}.safetensors")
+                        loss, _ = self.distiller.train_on_batch(samples_S, samples_T, teacher_output_path)
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
@@ -211,6 +232,7 @@ class DistillRunner:
                 global_rank = int(os.environ["RANK"])
                 if global_rank == 0:
                     wandb.log({"train/iteration": i, "train/loss": 0.0, "train/lr": 0.0})
+            total_cnt += 1
             # del samples_S, samples_T
             # gc.collect()
             # torch.cuda.empty_cache()
@@ -352,6 +374,7 @@ class DistillRunner:
         start_time = time.time()
         best_agg_metric = 0
         best_epoch = 0
+        cnt = 0
 
         for cur_epoch in tqdm(range(self.start_epoch, self.max_epoch), desc="[Training]", total=len(range(self.start_epoch, self.max_epoch))):
             if self.evaluate_only:
@@ -359,7 +382,8 @@ class DistillRunner:
 
             # training phase
             logging.info("Training Phase")
-            train_stats = self.train_epoch(cur_epoch)
+            train_stats = self.train_epoch(cur_epoch, cnt)
+            cnt += self.iters_per_epoch
             self.log_stats(train_stats, split_name="train")
 
             # validating phase

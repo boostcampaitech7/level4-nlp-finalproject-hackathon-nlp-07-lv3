@@ -5,7 +5,7 @@ from textbrewer.distiller_basic import BasicDistiller
 import torch.distributed as dist
 import torch.nn as nn
 import wandb
-from distillation.utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor, pad_logits
+from distillation.utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor, pad_logits, read_teacher_outputs
 # import pdb
 # from LLMPruner.peft import get_peft_model_state_dict
 
@@ -87,13 +87,20 @@ class CustomDistiller(GeneralDistiller):
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-    def train_on_batch(self, batch_S, batch_T, args=None):
+    def train_on_batch(self, batch_S, batch_T, args=None, T_outputs_path=None):
         args = args or {}
-        results_T = self.model_T(batch_T)
-        results_S = self.model_S(batch_S)
-        teacher_batch = batch_T
-        student_batch = batch_S
 
+        if self.model_T is not None:
+            results_T = self.model_T(batch_T)
+            results_S = self.model_S(batch_S)
+            teacher_batch = batch_T
+            student_batch = batch_S
+        else:
+            results_S = self.model_S(batch_S)
+            results_T = read_teacher_outputs(T_outputs_path)
+            teacher_batch = batch_S
+            student_batch = batch_S
+            
         '''
             /textbrewer/distiller_utils/post_adaptor
 

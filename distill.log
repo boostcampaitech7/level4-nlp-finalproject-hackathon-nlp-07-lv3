@@ -398,3 +398,8 @@
 2025-01-21 12:32:06,442 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 15.325325965881348, 'unweighted_hard_label_loss': 6.822229385375977}
 2025-01-21 12:32:08,138 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 16.68491554260254, 'unweighted_hard_label_loss': 7.298445701599121}
 2025-01-21 12:32:09,530 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 15.5496826171875, 'unweighted_hard_label_loss': 6.631133079528809}
+2025-01-21 18:52:31,875 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 15.578250885009766, 'unweighted_hard_label_loss': 8.035002708435059}
+2025-01-21 18:52:34,115 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 16.086528778076172, 'unweighted_hard_label_loss': 8.050286293029785}
+2025-01-21 18:55:42,852 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 15.578250885009766, 'unweighted_hard_label_loss': 8.035002708435059}
+2025-01-21 18:55:45,078 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 16.086528778076172, 'unweighted_hard_label_loss': 8.050286293029785}
+2025-01-22 01:33:34,207 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 20.196870803833008, 'unweighted_hard_label_loss': 8.180362701416016}

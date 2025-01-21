@@ -206,7 +206,7 @@ class SALMONN(nn.Module):
                 logging.info("Loading speech LLAMA proj from {}".format(speech_llama_proj_model))
                 speech_llama_proj_weight = torch.load(speech_llama_proj_model, map_location="cpu")
                 self.load_state_dict(speech_llama_proj_weight["model"], strict=False)
-            # self.speeech_llama_proj 가중치 freeze
+            # self.speech_llama_proj 가중치 freeze
             if freeze_speech_llama_proj:
                 for name, param in self.speech_llama_proj.named_parameters():
                     param.requires_grad = False

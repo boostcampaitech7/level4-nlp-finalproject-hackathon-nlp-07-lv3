@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.nn import Softmax, CrossEntropyLoss
+from safetensors.torch import save_file, load_file
 
 class DistillDataCollatorForSeq2Seq:
 
@@ -154,3 +155,7 @@ def pad_logits(student_logits, teacher_logits):
     elif student_size < teacher_size:
         student_logits = F.pad(student_logits, (0, 0, 0, pad_size)) 
     return student_logits, teacher_logits
+
+def read_teacher_outputs(teacher_output_path: str):
+    loaded_data = load_file(teacher_output_path)
+    return loaded_data
