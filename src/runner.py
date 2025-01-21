@@ -89,8 +89,8 @@ class Runner:
             print("valid가 있습니다.")
             valid_dataset = datasets["valid"]
         else:
-            print("valid가 없으므로 train에서 8:2 비율로 생성합니다.")
-            train_size = int(0.8 * len(train_dataset))
+            print("valid가 없으므로 train에서 9.5:0.5 비율로 생성합니다.")
+            train_size = int(0.95 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
 
             train_indices, valid_indices = random_split(
