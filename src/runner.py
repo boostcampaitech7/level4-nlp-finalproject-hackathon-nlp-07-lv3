@@ -9,6 +9,7 @@ import os
 import time
 from pathlib import Path
 
+from omegaconf import OmegaConf
 import torch
 import torch.distributed as dist
 from tensorboardX import SummaryWriter
@@ -20,9 +21,8 @@ from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, 
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
-from models.modeling_canary import get_dataloader_from_config, get_transcribe_config
-
-manifest_file_path = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')
+from models.json_to_manifest import json_to_manifest_indice
+from nemo.collections.asr.models import EncDecMultiTaskModel
 
 class Runner:
     def __init__(self, cfg, model, datasets, job_id, dryrun, SEED):
@@ -87,6 +87,7 @@ class Runner:
         
         if "valid" in datasets.keys():
             valid_dataset = datasets["valid"]
+            
         else:
             train_size = int(0.8 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
@@ -98,6 +99,13 @@ class Runner:
             valid_dataset = copy.deepcopy(train_dataset)
             train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
             valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
+            
+            # make temporary manifest file for train and validations
+            assert(self.config.config.datasets.train_manifest_path != '')
+            assert(self.config.config.datasets.valid_manifest_path != '')
+            
+            json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.train_manifest_path, train_indices)
+            json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.valid_manifest_path, valid_indices)
         
         
         test_dataset = datasets["test"] if "test" in datasets else None
@@ -113,11 +121,14 @@ class Runner:
             test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         ) if test_dataset else None
         
-        config, self.n_loader = get_dataloader_from_config(self.model.speech_encoder, manifest_file_path)
-        self.model.speech_encoder._update_dataset_config(dataset_name='test', config=config)
-        self.model.speech_encoder._test_dl = self.n_loader
+        self.train_config, self.n_loader_train = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.train_manifest_path, self.config.config.run.batch_size_train)
+        self.validation_config, self.n_loader_valid = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.valid_manifest_path, self.config.config.run.batch_size_eval)
         
-        self.n_transcribe_cfg = get_transcribe_config()
+        self.model.speech_encoder._update_dataset_config(dataset_name='train', config=self.train_config)
+        self.model.speech_encoder._train_dl = self.n_loader_train
+        
+        self.model.speech_encoder._update_dataset_config(dataset_name='validation', config=self.validation_config)
+        self.model.speech_encoder._validation_dl = self.n_loader_valid
 
         # scaler
         self.use_amp = self.config.config.run.get("amp", False)
@@ -142,6 +153,26 @@ class Runner:
         )
 
         self.log_config()
+
+    def get_dataloader_from_config(self, model : EncDecMultiTaskModel, manifet_path : str, batch_size, test_config : OmegaConf = None):
+        if test_config:
+            config = config
+        
+        else:
+            config = OmegaConf.create(
+            dict(
+                manifest_filepath=manifet_path,
+                sample_rate=16000,
+                labels=None,
+                batch_size=batch_size,
+                shuffle=False,
+                time_length=30,
+                use_lhotse = True,
+            )
+        )
+            
+        return config, model._setup_dataloader_from_config(config=config)
+
 
     def unwrap_dist_model(self, model):
         if self.use_distributed:
@@ -172,14 +203,14 @@ class Runner:
             samples = next(self.train_loader)
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
             
-            n_samples = next(self.n_loader._get_iterator())
+            n_samples = next(self.n_loader_train._get_iterator())
 
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     profile_flag = True if i == 0 and profile_flag else False
-                    loss = self.model(samples, n_samples, self.n_transcribe_cfg, profile_flag=profile_flag)["loss"]
+                    loss = self.model(samples, n_samples, profile_flag=profile_flag)["loss"]
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
@@ -234,10 +265,11 @@ class Runner:
         results = []
         for samples in metric_logger.log_every(dataloader, self.config.config.run.log_freq, header=header):
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
-
+            n_samples = next(self.n_loader_valid._get_iterator())
+            
             if not self.dryrun:
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
-                    forward_result = model(samples, verbose=True)
+                    forward_result = model(samples, n_samples, verbose=True)
                 loss = forward_result.get("loss", 0)
                 correct = forward_result.get("correct", 0)
                 total = forward_result.get("total", 1)

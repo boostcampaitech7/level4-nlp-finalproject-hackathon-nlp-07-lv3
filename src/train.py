@@ -88,8 +88,10 @@ def main():
     data_config = cfg.config.datasets
     wandb_config = cfg.config.wandb
 
-    exp_name = input("write wandb exp_name:")
-
+    #exp_name = input("write wandb exp_name:")
+    exp_name = "test"
+    print("write wandb exp_name: to test")
+    
     # Wandb setup
     if wandb_config.log:
         wandb.login(key=wandb_config.key)

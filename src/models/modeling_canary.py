@@ -79,7 +79,7 @@ def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str,
             labels=None,
             batch_size=2,
             shuffle=False,
-            time_length=20,
+            time_length=30,
             use_lhotse = True,
         )
     )
@@ -104,16 +104,30 @@ def get_transcribe_config(transcribe_cfg: TranscribeConfig = None):
 
     return transcribe_cfg
 
-
-def get_embeddings(speaker_model : EncDecMultiTaskModel, manifest_file, batch_size=2, embedding_dir='./', device='cuda'):
+def train_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda:1'):
     config, _ = get_dataloader_from_config(speaker_model, manifest_file)
-    transcribe_cfg = get_transcribe_config()
+
+    speaker_model.setup_training_data(config)
+
+    return speaker_model
+
+def test_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda:1'):
+    config, _ = get_dataloader_from_config(speaker_model, manifest_file)
 
     speaker_model.setup_test_data(config)
-    speaker_model = speaker_model.to(device)
-    speaker_model.eval()
-           
-    for test_batch in tqdm(speaker_model.test_dataloader(), desc="Transcribing", disable=not transcribe_cfg.verbose):      
+
+    return speaker_model
+
+def valid_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda:1'):
+    config, _ = get_dataloader_from_config(speaker_model, manifest_file)
+
+    speaker_model.setup_validation_data(config)
+    
+    return speaker_model
+
+def execute_model(speaker_model : EncDecMultiTaskModel, transcribe_cfg, device='cuda:1'):
+
+    for test_batch in tqdm(speaker_model.val_dataloader(), desc="Transcribing", disable=not transcribe_cfg.verbose):      
         # Move batch to device
         # Run forward pass
         with autocast():
@@ -124,6 +138,20 @@ def get_embeddings(speaker_model : EncDecMultiTaskModel, manifest_file, batch_si
             log_probs, encoded_len, speech_embeds, enc_mask = speaker_model.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
 
     return speech_embeds
+
+
+def build_models(canary_path : str, train_manifest_path : str, valid_manifest_path : str, test_manifest_path : str, device : str):
+    canary_model = EncDecMultiTaskModel.from_pretrained(canary_path)
+
+    canary_model = train_setup(canary_model, train_manifest_path, device)
+    canary_model = valid_setup(canary_model, valid_manifest_path, device)
+    canary_model = test_setup(canary_model, test_manifest_path, device)
+    
+    canary_model = canary_model.to(device)
+
+    return canary_model
+    
+
 
 # manifest_filepath = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')
 # device = 'cuda'

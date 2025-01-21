@@ -13,12 +13,14 @@
 # limitations under the License.
 
 import contextlib
+from dataclasses import fields, is_dataclass
 import json
 import logging
 import random
 import os
 import random
 import time
+from typing import Any, Union
 
 import torch
 import torch.nn as nn
@@ -287,6 +289,24 @@ class SALMONN(nn.Module):
 
             print("Loading training prompts done!")
 
+    def move_data_to_device(self, inputs: Any, device: Union[str, torch.device], non_blocking: bool = True) -> Any:
+        """Recursively moves inputs to the specified device"""
+        if isinstance(inputs, torch.Tensor):
+            return inputs.to(device, non_blocking=non_blocking)
+        elif isinstance(inputs, (list, tuple, set)):
+            return inputs.__class__([self.move_data_to_device(i, device, non_blocking) for i in inputs])
+        elif isinstance(inputs, dict):
+            return {k: self.move_data_to_device(v, device, non_blocking) for k, v in inputs.items()}
+        elif is_dataclass(inputs):
+            return type(inputs)(
+                **{
+                    field.name: self.move_data_to_device(getattr(inputs, field.name), device, non_blocking)
+                    for field in fields(inputs)
+                }
+            )
+        else:
+            return inputs
+
     def _encode_auditory_feature(self, speech_embeds, audio_embeds=None):
         if self.profile_flag:
             qformer_profiler.__enter__()
@@ -353,21 +373,33 @@ class SALMONN(nn.Module):
 
         return speech_embeds, speech_atts
 
-    def encode_speech(self, spectrogram, raw_wav=None, audio_padding_mask=None):
+    def encode_speech(self, spectrogram, n_samples, raw_wav=None, audio_padding_mask=None):
         with self.maybe_autocast():
             if self.profile_flag:
                 whisper_profiler.__enter__()
-                logging.info("Start Whipser Encoding")
-                speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
+                # logging.info("Start Whipser Encoding")
+                # speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
+                # whisper_profiler.__exit__(None, None, None)
+                
+                logging.info("Start Canary Encoding")
+                
+                spectrogram, spectrogram_len, = n_samples.audio, n_samples.audio_lens
+                _, _, speech_embeds, enc_mask = self.speech_encoder.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
                 whisper_profiler.__exit__(None, None, None)
 
             else:
-                speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
+                #speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
+            
+                spectrogram, spectrogram_len, = n_samples.audio, n_samples.audio_lens
+                spectrogram = spectrogram.to('cuda:1')
+                
+                _, _, speech_embeds, enc_mask = self.speech_encoder.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
 
             if self.beats_path and raw_wav is not None:
                 if self.profile_flag:
                     beats_profiler.__enter__()
                     logging.info("Start BEATs Encoding")
+                    
                     audio_embeds, _ = self.beats.extract_features(
                         raw_wav, padding_mask=audio_padding_mask, feature_only=True
                     )
@@ -468,10 +500,15 @@ class SALMONN(nn.Module):
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
 
+        n_samples = self.move_data_to_device(n_samples, 'cuda:1')
+        spectrogram = self.move_data_to_device(spectrogram, 'cuda:1')
+        raw_wav = self.move_data_to_device(raw_wav, 'cuda:1')
+        audio_padding_mask = self.move_data_to_device(raw_wav, 'cuda:1')
+
         # speech encoder + non-speech encoder 의 결과물을 합쳐서 QFormer를 통과 후에 LLM에 들어가기 위해서 proj 까지 완료된 결과물
         # LLM에 input으로 들어가기 위한 값들
         speech_embeds, speech_atts = self.encode_speech(
-            spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
+            spectrogram, n_samples, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
         )
 
         # wrap speech_embeds with prompts
