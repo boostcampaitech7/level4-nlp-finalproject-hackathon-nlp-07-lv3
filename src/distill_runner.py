@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import time
+import gc
 from pathlib import Path
 from tqdm import tqdm
 
@@ -20,14 +21,9 @@ from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, 
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
-from distillation import CustomDistiller
-from textbrewer import TrainingConfig, DistillationConfig
-
-def simple_adaptor(batch, model_outputs):
-    return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
 
 class DistillRunner:
-    def __init__(self, cfg, model_T, model_S, datasets, job_id, dryrun, SEED):
+    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED):
         self.seed = SEED
         self.config = cfg
 
@@ -41,6 +37,7 @@ class DistillRunner:
 
         # settings
         self.device = torch.device(self.config.config.run.device)
+        self.device2 = torch.device(self.config.config.run.device2)
         self.use_distributed = self.config.config.run.use_distributed
         self.start_epoch = 0
         self.max_epoch = self.config.config.run.optims.max_epoch
@@ -74,35 +71,24 @@ class DistillRunner:
 
         else:
             self.test_prompt_dict = None
-
-        # model_T
-        self._model_T = model_T
-        self._model_T.to(self.device)
-        if self.use_distributed:
-            self.model_T = DDP(self._model_T, device_ids=[self.config.config.run.gpu])
-        else:
-            self.model_T = self._model_T
         
         # model_S
         self._model_S = model_S
         self._model_S.to(self.device)
         if self.use_distributed:
-            self.model_S = DDP(self._model_S, device_ids=[self.config.config.run.gpu])
+            self.model_S = DDP(self._model_S)
         else:
             self.model_S = self._model_S
+        
+        # model_T
+        self._model_T = model_T
+        self._model_T.to(self.device2)
+        if self.use_distributed:
+            self.model_T = DDP(self._model_T)
+        else:
+            self.model_T = self._model_T
 
-        self.distiller = CustomDistiller(
-                            train_config=TrainingConfig(),
-                            distill_config=DistillationConfig(),
-                            model_T=model_T, 
-                            model_S=model_S, 
-                            adaptor_T=simple_adaptor, 
-                            adaptor_S=simple_adaptor,
-                            logits_pro=['linear',model_S.llama_model.get_input_embeddings().num_embeddings,model_T.llama_model.get_input_embeddings().num_embeddings],
-                            global_step_start=0,
-                            use_softmax=True,
-                            dt_normalization_type='softmax',
-                            )
+        self.distiller = distiller
                             
         # datasets["train"]는 SALMONNDataset 인스턴스
         train_dataset = datasets["train"]
@@ -161,8 +147,8 @@ class DistillRunner:
             return model
 
     def train_epoch(self, epoch):
-        # self.model_T.eval()
-        # self.model_S.train()
+        self.model_T.eval()
+        self.model_S.train()
 
         metric_logger = MetricLogger(delimiter="  ")
         metric_logger.add_meter("lr", SmoothedValue(window_size=1, fmt="{value:.6f}"))
@@ -181,14 +167,16 @@ class DistillRunner:
             if i >= self.iters_per_epoch:
                 break
 
-            samples = next(self.train_loader)
-            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
+            samples_S = next(self.train_loader)
+            samples_T = copy.deepcopy(samples_S)
+            samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
+            samples_T = prepare_sample(samples_T, cuda_enabled=self.cuda_enabled, device=self.device2)
 
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
-                    loss, _ = self.distiller.train_on_batch(samples)
+                    loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
@@ -223,6 +211,9 @@ class DistillRunner:
                 global_rank = int(os.environ["RANK"])
                 if global_rank == 0:
                     wandb.log({"train/iteration": i, "train/loss": 0.0, "train/lr": 0.0})
+            # del samples_S, samples_T
+            # gc.collect()
+            # torch.cuda.empty_cache()
 
         metric_logger.synchronize_between_processes()
         logging.info("Averaged stats: " + str(metric_logger.global_avg()))
@@ -233,6 +224,7 @@ class DistillRunner:
     def valid_epoch(self, epoch, split, decode=False, save_json=False):
         if not self.dryrun:
             model = self.unwrap_dist_model(self.model_S)
+            model.distillation = False
             model.eval()
 
         dataloader = getattr(self, split + "_loader", None)
@@ -291,6 +283,8 @@ class DistillRunner:
         if save_json:
             self.save_result(results, self.output_dir, "eval_{}_epoch_{}".format(split, epoch))
 
+        model.distillation = True
+        
         res = {
             "loss": torch.tensor(0).float().cuda(),
             "n_sample": torch.tensor(0).float().cuda(),

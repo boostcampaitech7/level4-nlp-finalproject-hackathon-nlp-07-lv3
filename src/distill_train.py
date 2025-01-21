@@ -31,6 +31,8 @@ from distillation import CustomDistiller
 from textbrewer import GeneralDistiller, TrainingConfig, DistillationConfig
 from utils import setup_logger
 from distill_runner import DistillRunner
+from distillation import CustomDistiller
+from textbrewer import TrainingConfig, DistillationConfig
 
 def now():
     seoul_tz = pytz.timezone("Asia/Seoul")
@@ -40,8 +42,6 @@ def now():
 def parse_args():
     parser = argparse.ArgumentParser(description="train parameters")
     parser.add_argument("--cfg-path", type=str, required=True, help="path to configuration file")
-    # parser.add_argument("--cfg-model-T-path", type=str, required=True, help="path to configuration file")
-    # parser.add_argument("--cfg-model-S-path", type=str, required=True, help="path to configuration file")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -72,6 +72,7 @@ def simple_adaptor(batch, model_outputs):
 def main():
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
     job_id = now()
+    date_wandb = job_id[4:12]
 
     # load config
     args = parse_args()
@@ -132,14 +133,30 @@ def main():
     if not args.dryrun:
         model_T = load_model(model_T_config)
         model_S = load_model(model_S_config)
+        distiller = CustomDistiller(
+                        train_config=TrainingConfig(),
+                        distill_config=DistillationConfig(
+                            hard_label_weight=0.5,
+                            kd_loss_weight=0.5
+                        ),
+                        model_T=model_T, 
+                        model_S=model_S, 
+                        adaptor_T=simple_adaptor, 
+                        adaptor_S=simple_adaptor,
+                        logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
+                        global_step_start=0,
+                        use_softmax=True,
+                        dt_normalization_type='softmax',
+                    )
     else:  # load small dummy language model
         return
 
     # build stage1 runner
-    runner_1 = DistillRunner(cfg, model_T, model_S, datasets, job_id, args.dryrun, SEED)
+    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
 
     # stage1 train, return 마지막 ckpt 경로 넘겨 받음
     ckpt_path = runner_1.train()
+    torch.cuda.empty_cache()
 
     # stage1 wandb 종료
     wandb.finish()
@@ -160,7 +177,7 @@ def main():
     # stage2 optim 설정으로 바꾸기
     cfg.config.run.optims = optims_2
     cfg.config.run.output_dir = output_dir_2
-    cfg.config.model.ckpt = ckpt_path
+    cfg.config.model_S.ckpt = ckpt_path
 
     # print config
     cfg.pretty_print()
@@ -168,37 +185,14 @@ def main():
     # Wandb setup, stage2 wandb 시작
     if wandb_config.log:
         wandb.init(
-            project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_" + exp_name, config=cfg
+            project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_", config=cfg
         )
 
     # build stage2 runner
-    runner_2 = DistillRunner(cfg, model_T, model_S, datasets, job_id, args.dryrun, SEED)
+    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
 
     # stage2 train
     runner_2.train()
-
-    # # print config
-    # cfg.pretty_print()
-
-    # # build datasets
-    # datasets = {
-    #     "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path, data_config.whisper_path),
-    #     # "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path, data_config.whisper_path),
-    #     # "test": SALMONNDataset(data_config.prefix, data_config.test_ann_path, data_config.whisper_path),
-    # }
-
-    # # build model
-    # if not args.dryrun:
-    #     model_T = load_model(model_T_config)
-    #     model_S = load_model(model_S_config)
-    # else:  
-    #     return
-
-    # # build runner
-    # runner = DistillRunner(cfg, model_T, model_S, datasets, job_id, args.dryrun)
-
-    # # train
-    # runner.train()
 
 if __name__ == "__main__":
     main()

@@ -5,7 +5,7 @@ from textbrewer.distiller_basic import BasicDistiller
 import torch.distributed as dist
 import torch.nn as nn
 import wandb
-from distillation.utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor
+from distillation.utils import dynamic_kd_loss, dynamic_temperature, minmax_normalize, softmax_normalize, standardize_tensor, pad_logits
 # import pdb
 # from LLMPruner.peft import get_peft_model_state_dict
 
@@ -24,7 +24,7 @@ class CustomDistiller(GeneralDistiller):
                  use_softmax,
                  dt_normalization_type,
                 #intermediate_normalization_type,
-                 kd_type : Optional[str] = "original_kd",
+                 kd_type : Optional[str] = "dynamic_kd",
                  intermediate_control_config='',
                  layer_weight=0.1,
     ):
@@ -87,12 +87,12 @@ class CustomDistiller(GeneralDistiller):
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-    def train_on_batch(self, batch, args=None):
+    def train_on_batch(self, batch_S, batch_T, args=None):
         args = args or {}
-        batch = move_to_device(batch, self.t_config.device)
-        results_T = self.model_T(batch)
-        results_S = self.model_S(batch)
-        teacher_batch = student_batch = batch
+        results_T = self.model_T(batch_T)
+        results_S = self.model_S(batch_S)
+        teacher_batch = batch_T
+        student_batch = batch_S
 
         '''
             /textbrewer/distiller_utils/post_adaptor
@@ -148,8 +148,10 @@ class CustomDistiller(GeneralDistiller):
             if self.d_config.probability_shift is True:
                 labels_list = results_S['labels']
                 for l_T, l_S, labels in zip(logits_list_T, logits_list_S, labels_list):
+                    l_T, l_S = l_T.to(self.t_config.device), l_S.to(self.t_config.device)
                     l_T = probability_shift_(l_T, labels)
                     # if results_T['logits'][0].shape[-1] != results_S['logits'][0].shape[-1]:
+                    l_S, l_T = pad_logits(l_S, l_T)
 
                     # student -> teacher 의 차원으로 projection
                     for logits_layer in self.logits_projs:
@@ -169,12 +171,12 @@ class CustomDistiller(GeneralDistiller):
             else:
                 for l_T, l_S in zip(logits_list_T, logits_list_S):
                     # if results_T['logits'][0].shape[-1] != results_S['logits'][0].shape[-1]:
+                    l_T, l_S = l_T.to(self.t_config.device), l_S.to(self.t_config.device)
+                    l_S, l_T = pad_logits(l_S, l_T)
 
                     for logits_layer in self.logits_projs:
                         l_S = logits_layer(l_S)
 
-                    print(l_T.size())
-                    print(l_S.size())
                     if self.d_config.temperature_scheduler is not None:
                         temperature = self.d_config.temperature_scheduler(l_S, l_T, self.d_config.temperature)
                     else:
@@ -256,8 +258,8 @@ class CustomDistiller(GeneralDistiller):
                 value = value.item()
             formated_losses_dict[key]=value
         self.logger.info(formated_losses_dict)
-        if dist.get_rank() == 0:
-            wandb.log(formated_losses_dict)
+        # if dist.get_rank() == 0:
+        wandb.log(formated_losses_dict)
         print(losses_dict)
         return total_loss, losses_dict
 

@@ -144,3 +144,13 @@ def dynamic_temperature(student_logits, teacher_logits, normalization_type=''):
     loss = torch.sum(torch.sum(F.kl_div(p_s, p_t, reduction='none'), dim=-1) * (1 * torch.ones(student_logits.shape[0],1).cuda())) /student_logits.shape[0]/ student_logits.shape[0]
     return loss
 
+def pad_logits(student_logits, teacher_logits):
+    if len(student_logits.shape) == 3: student_logits = student_logits.squeeze(0)
+    if len(teacher_logits.shape) == 3: teacher_logits = teacher_logits.squeeze(0)
+    student_size, teacher_size = student_logits.size(-2), teacher_logits.size(-2)
+    pad_size = abs(student_size - teacher_size)
+    if student_size > teacher_size:
+        teacher_logits = F.pad(teacher_logits, (0, 0, 0, pad_size))
+    elif student_size < teacher_size:
+        student_logits = F.pad(student_logits, (0, 0, 0, pad_size)) 
+    return student_logits, teacher_logits
