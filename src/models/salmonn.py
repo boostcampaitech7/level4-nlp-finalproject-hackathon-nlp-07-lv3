@@ -318,6 +318,11 @@ class SALMONN(nn.Module):
                 if audio_embeds is not None:
                     audio_embeds = self.ln_audio(audio_embeds)
 
+                    # # check if first dimension (Batch Size) is different
+                    # # if different, repeat audio_embeds to match speech_embeds
+                    # if audio_embeds.size(0) != speech_embeds.size(0):
+                    #     audio_embeds = audio_embeds.repeat(speech_embeds.size(0), 1, 1)
+
                     # 두 임베딩 값의 크기를 맞춰서 padding
                     if audio_embeds.size(1) < speech_embeds.size(1):
                         audio_embeds = F.pad(audio_embeds, (0, 0, 0, speech_embeds.size(1) - audio_embeds.size(1)))

@@ -89,7 +89,7 @@ class Runner:
             valid_dataset = datasets["valid"]
             
         else:
-            train_size = int(0.8 * len(train_dataset))
+            train_size = int(0.9995 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
 
             train_indices, valid_indices = random_split(
@@ -383,7 +383,8 @@ class Runner:
 
         # testing phase
         start, mid, end = 0, (self.start_epoch + self.max_epoch - 1) // 2, self.max_epoch - 1
-
+        save_directory = ""
+        
         for cur_epoch in range(self.start_epoch, self.max_epoch):
             # training phase
             logging.info("Training Phase")
@@ -415,7 +416,7 @@ class Runner:
             if self.use_distributed:
                 dist.barrier()
 
-        self.save_checkpoint(cur_epoch, is_best=False)
+        save_directory = self.save_checkpoint(cur_epoch, is_best=False)
 
         if self.evaluate_only:
             test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
@@ -426,6 +427,7 @@ class Runner:
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
 
+        assert(save_directory != "")
         return save_directory
 
     @main_process
