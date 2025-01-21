@@ -73,8 +73,6 @@ class SALMONNTestDataset(Dataset):
             except KeyError:
                 pass
 
-
-
         return entity
 
     def __getitem__(self, index):

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import logging
 import os
 
 import librosa
@@ -68,10 +69,16 @@ class SALMONNDataset(Dataset):
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        audio_path = self.prefix + '/' + ann["path"]
-        audio, sr = sf.read(audio_path)
-        
-        if len(audio.shape) == 2: # stereo to mono
+        audio_path = self.prefix + "/" + ann["path"]
+
+        # 경로 및 오디오 로드 확인
+        try:
+            audio, sr = sf.read(audio_path)
+        except sf.LibsndfileError as e:
+            logging.error(f"LibsndfileError: {e}")
+            logging.error(f"Exception details: {e.args}")
+
+        if len(audio.shape) == 2:  # stereo to mono
             audio = audio[:, 0]
 
         if len(audio) < sr:  # pad audio to at least 1s

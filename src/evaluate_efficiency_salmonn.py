@@ -3,15 +3,12 @@ import gc
 import json
 import os
 import subprocess
-import sys
 import time
-from pathlib import Path
 
 import numpy as np
 import torch
 from tqdm import tqdm
-from transformers import DynamicCache
-from transformers import WhisperFeatureExtractor
+from transformers import DynamicCache, WhisperFeatureExtractor
 
 from config import Config
 from dataset import SALMONNDataset
@@ -20,6 +17,7 @@ from utils import get_dataloader, prepare_sample
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 def load_model(salmonn_preprocessor):
     model = salmonn_preprocessor.llama_model
@@ -161,7 +159,7 @@ def main(args):
     salmonn_preprocessor.llama_model = llama_model
 
     # Load dataset
-    with open("audiolm-trainer/prompts/test_prompt.json", "r") as f:
+    with open("./prompts/test_prompt.json", "r") as f:
         test_prompt = json.load(f)
     dataloader = MockDataset.make_mock_dataloader(cfg, sr=16000, audio_length=10)
     sample_batch = next(iter(dataloader))

@@ -1,12 +1,12 @@
 # This script is based on https://github.com/salesforce/LAVIS/blob/main/lavis/runners/runner_base.py
-import subprocess
-import sys
 import copy
 import datetime
 import glob
 import json
 import logging
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -335,6 +335,7 @@ class Runner:
         start_time = time.time()
         best_agg_metric = 0
         best_epoch = 0
+        best_save_directory = None  # 가장 좋은 모델 경로를 추적
 
         for cur_epoch in range(self.start_epoch, self.max_epoch):
             if self.evaluate_only:
@@ -356,7 +357,7 @@ class Runner:
                         best_epoch = cur_epoch
 
                         # 평가 메트릭을 통해서 Best 모델인 경우 저장
-                        save_directory = self.save_checkpoint(cur_epoch, is_best=True)
+                        best_save_directory = self.save_checkpoint(cur_epoch, is_best=True)
 
                     valid_log.update({"best_epoch": best_epoch})
                     self.log_stats(valid_log, split_name="valid")
@@ -366,7 +367,7 @@ class Runner:
                 dist.barrier()
 
         # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
-        self.save_checkpoint(cur_epoch, is_best=False)
+        last_save_directory = self.save_checkpoint(cur_epoch, is_best=False)
 
         # testing phase
         if self.evaluate_only:
@@ -378,7 +379,7 @@ class Runner:
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
 
-        return save_directory
+        return best_save_directory if best_save_directory is not None else last_save_directory
 
     @main_process
     def log_config(self):
@@ -435,4 +436,4 @@ class Runner:
 
 
 if __name__ == "__main__":
-    subprocess.run([f'{sys.executable}', "train.py", "--cfg-path", "./configs/train.yaml"])
+    subprocess.run([f"{sys.executable}", "train.py", "--cfg-path", "./configs/train.yaml"])
