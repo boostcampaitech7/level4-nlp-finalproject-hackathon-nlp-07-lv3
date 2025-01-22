@@ -16,7 +16,7 @@ def json_to_manifest(src_path, dst_path, options=default_manifest_options):
     # write each path to dst jsonl file
     with open(src_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
+
     # ex) data[0]['path'] = 'data/whisper/whisper_00000.wav'
     # then jsonl line should be {"audio_filepath": "data/whisper/whisper_00000.wav","duration": 1500,"taskname": "asr","source_lang": "en","target_lang": "en","pnc": "yes","answer": "na"}
     with open(dst_path, 'w', encoding='utf-8') as f:
@@ -24,24 +24,24 @@ def json_to_manifest(src_path, dst_path, options=default_manifest_options):
             audio_filepath = d['path']
             slash = '' if audio_filepath[0] == '/' else '/'
             audio_filepath = manifest_prefix + slash + audio_filepath
-            
+
             task_name = d['task']
-            
-            f.write(json.dumps({"audio_filepath": audio_filepath, "taskname": task_name, **options}) + '\n')
+
+            f.write(json.dumps({"audio_filepath": audio_filepath, "taskname": "asr", **options}) + '\n')
 
 def json_to_manifest_indice(src_path, dst_path, indices):
     with open(src_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
+
     with open(dst_path, 'w', encoding='utf-8') as f:
         for i in indices:
             d = data['annotation'][i]
             audio_filepath = d['path']
             slash = '' if audio_filepath[0] == '/' else '/'
             audio_filepath = manifest_prefix + slash + audio_filepath
-            
+
             task_name = d['task']
-            
+
             f.write(json.dumps({"audio_filepath": audio_filepath, "taskname": "asr", **default_manifest_options}) + '\n')
 
     return dst_path

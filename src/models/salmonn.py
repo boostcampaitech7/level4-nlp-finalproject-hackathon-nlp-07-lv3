@@ -176,8 +176,8 @@ class SALMONN(nn.Module):
         # assert whisper_path
         # logging.info("Loading Whisper Model")
         # self.speech_encoder = WhisperModel.from_pretrained(whisper_path).encoder
-        
-        
+
+
         # canary model
         assert canary_path
         logging.info("Loading Canary Model")
@@ -193,7 +193,8 @@ class SALMONN(nn.Module):
             for name, param in self.speech_encoder.named_parameters():
                 param.requires_grad = False
             self.speech_encoder.eval()
-            logging.info("freeze Whisper")
+            #logging.info("freeze Whisper")
+            logging.info("freeze Canary Model")
 
         if self.beats_path:
             logging.info("Loading BEATs Model")
@@ -318,7 +319,7 @@ class SALMONN(nn.Module):
                 if audio_embeds is not None:
                     audio_embeds = self.ln_audio(audio_embeds)
 
-                    # # check if first dimension (Batch Size) is different
+                    # # check if first dimension (Batch Size, Time stamp, Hidden Lens) is different
                     # # if different, repeat audio_embeds to match speech_embeds
                     # if audio_embeds.size(0) != speech_embeds.size(0):
                     #     audio_embeds = audio_embeds.repeat(speech_embeds.size(0), 1, 1)
@@ -378,33 +379,33 @@ class SALMONN(nn.Module):
 
         return speech_embeds, speech_atts
 
-    def encode_speech(self, spectrogram, n_samples, raw_wav=None, audio_padding_mask=None):
+    def encode_speech(self, n_samples, raw_wav=None, audio_padding_mask=None):
         with self.maybe_autocast():
             if self.profile_flag:
                 whisper_profiler.__enter__()
                 # logging.info("Start Whipser Encoding")
                 # speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
                 # whisper_profiler.__exit__(None, None, None)
-                
+
                 logging.info("Start Canary Encoding")
-                
+
                 spectrogram, spectrogram_len, = n_samples.audio, n_samples.audio_lens
                 _, _, speech_embeds, enc_mask = self.speech_encoder.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
                 whisper_profiler.__exit__(None, None, None)
 
             else:
                 #speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
-            
+
                 spectrogram, spectrogram_len, = n_samples.audio, n_samples.audio_lens
                 spectrogram = spectrogram.to('cuda:1')
-                
+
                 _, _, speech_embeds, enc_mask = self.speech_encoder.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
 
             if self.beats_path and raw_wav is not None:
                 if self.profile_flag:
                     beats_profiler.__enter__()
                     logging.info("Start BEATs Encoding")
-                    
+
                     audio_embeds, _ = self.beats.extract_features(
                         raw_wav, padding_mask=audio_padding_mask, feature_only=True
                     )
@@ -501,19 +502,18 @@ class SALMONN(nn.Module):
                 prompt = random.choice(self.prompt_dict[samples["task"][0]])
 
         # use speech/audio encoder to encode speech/audio
-        spectrogram = samples["spectrogram"]
+        #spectrogram = samples["spectrogram"]
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
 
         n_samples = self.move_data_to_device(n_samples, 'cuda:1')
-        spectrogram = self.move_data_to_device(spectrogram, 'cuda:1')
         raw_wav = self.move_data_to_device(raw_wav, 'cuda:1')
         audio_padding_mask = self.move_data_to_device(raw_wav, 'cuda:1')
 
         # speech encoder + non-speech encoder 의 결과물을 합쳐서 QFormer를 통과 후에 LLM에 들어가기 위해서 proj 까지 완료된 결과물
         # LLM에 input으로 들어가기 위한 값들
         speech_embeds, speech_atts = self.encode_speech(
-            spectrogram, n_samples, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
+            n_samples, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
         )
 
         # wrap speech_embeds with prompts
@@ -534,7 +534,7 @@ class SALMONN(nn.Module):
             truncation=True,
             max_length=self.max_txt_len,
             add_special_tokens=False,
-        ).to(spectrogram.device)
+        ).to(n_samples.device)
         to_regress_embeds = (
             self.llama_model.model.embed_tokens(to_regress_tokens.input_ids)
             if not self.lora
@@ -551,7 +551,7 @@ class SALMONN(nn.Module):
         # 오디오 인코더 길이 만큼의 -100 으로 마스킹 처리
         empty_targets = (
             torch.ones([speech_atts.shape[0], speech_atts.shape[1] + 1], dtype=torch.long)
-            .to(spectrogram.device)
+            .to(n_samples.device)
             .fill_(-100)
         )
         targets = torch.cat([empty_targets, targets], dim=1)
@@ -727,14 +727,13 @@ class SALMONN(nn.Module):
             device_8bit=device_8bit,
             token=token,
             only_preprocessor=only_preprocessor,
-            
             canary_path=canary_path,
         )
 
         ckpt_path = config.get("ckpt", "")
         if ckpt_path:
             logging.info("Load SALMONN ckpt from: {}".format(ckpt_path))
-            ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+            ckpt = torch.load(ckpt_path, map_location="cuda:1", weights_only=True)
             model.load_state_dict(ckpt["model"], strict=False)
 
         return model

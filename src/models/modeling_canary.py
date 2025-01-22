@@ -39,7 +39,7 @@ class TranscribeConfig:
     batch_size: int = 4
     return_hypotheses: bool = False
     num_workers: Optional[int] = None
-    channel_selector: ChannelSelectorType = None
+    channel_selector: ChannelSelectorType = 'average'
     augmentor: Optional[DictConfig] = None
     timestamps: Optional[bool] = None  # returns timestamps for each word and segments if model supports punctuations
     verbose: bool = True
@@ -48,6 +48,7 @@ class TranscribeConfig:
     partial_hypothesis: Optional[List[Any]] = None
 
     _internal: Optional[InternalTranscribeConfig] = None
+
 
 def move_data_to_device(inputs: Any, device: Union[str, torch.device], non_blocking: bool = True) -> Any:
     """Recursively moves inputs to the specified device"""
@@ -70,7 +71,7 @@ def move_data_to_device(inputs: Any, device: Union[str, torch.device], non_block
 def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str, test_config : OmegaConf = None, transcribe_cfg: TranscribeConfig = None):
     if test_config:
         config = config
-    
+
     else:
         config = OmegaConf.create(
         dict(
@@ -81,26 +82,27 @@ def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str,
             shuffle=False,
             time_length=30,
             use_lhotse = True,
+            channel_selector=0,
         )
     )
-    
+
     return config, model._setup_dataloader_from_config(config=config)
 
 def get_transcribe_config(transcribe_cfg: TranscribeConfig = None):
     if transcribe_cfg:
         transcribe_cfg = transcribe_cfg
-    
+
     else:
         transcribe_cfg = TranscribeConfig(
             batch_size=2,
             return_hypotheses=False,
             num_workers=0,
-            channel_selector=None,
+            channel_selector=0,
             augmentor=None,
             verbose=True,
             timestamps=None,
             _internal=InternalTranscribeConfig(),
-        ) 
+        )
 
     return transcribe_cfg
 
@@ -122,19 +124,19 @@ def valid_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cud
     config, _ = get_dataloader_from_config(speaker_model, manifest_file)
 
     speaker_model.setup_validation_data(config)
-    
+
     return speaker_model
 
 def execute_model(speaker_model : EncDecMultiTaskModel, transcribe_cfg, device='cuda:1'):
 
-    for test_batch in tqdm(speaker_model.val_dataloader(), desc="Transcribing", disable=not transcribe_cfg.verbose):      
+    for test_batch in tqdm(speaker_model.val_dataloader(), desc="Transcribing", disable=not transcribe_cfg.verbose):
         # Move batch to device
         # Run forward pass
         with autocast():
             test_batch = move_data_to_device(test_batch, transcribe_cfg._internal.device)
             spectrogram, spectrogram_len, = test_batch.audio, test_batch.audio_lens
             spectrogram = spectrogram.to(device)
-            
+
             log_probs, encoded_len, speech_embeds, enc_mask = speaker_model.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
 
     return speech_embeds
@@ -146,11 +148,11 @@ def build_models(canary_path : str, train_manifest_path : str, valid_manifest_pa
     canary_model = train_setup(canary_model, train_manifest_path, device)
     canary_model = valid_setup(canary_model, valid_manifest_path, device)
     canary_model = test_setup(canary_model, test_manifest_path, device)
-    
+
     canary_model = canary_model.to(device)
 
     return canary_model
-    
+
 
 
 # manifest_filepath = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')

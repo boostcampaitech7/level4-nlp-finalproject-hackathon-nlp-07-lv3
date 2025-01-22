@@ -4,6 +4,7 @@ import os
 import random
 import time
 
+from omegaconf import OmegaConf
 import pandas as pd
 import torch
 from tqdm import tqdm
@@ -12,6 +13,7 @@ from config import Config
 from metrics import compute_spider, compute_wer
 from salmonn_utils import SALMONNTestDataset, load_model, load_preprocessor
 from utils import get_dataloader, prepare_sample
+from models.json_to_manifest import json_to_manifest
 
 
 def parse_args():
@@ -97,6 +99,26 @@ def replace_test_ann_path(cfg):
     return cfg
 
 
+def get_dataloader_from_config(model, manifet_path : str, batch_size, test_config = None):
+    if test_config:
+        config = config
+
+    else:
+        config = OmegaConf.create(
+        dict(
+            manifest_filepath=manifet_path,
+            sample_rate=16000,
+            labels=None,
+            batch_size=batch_size,
+            shuffle=False,
+            time_length=30,
+            use_lhotse = True,
+        )
+    )
+
+    return config, model._setup_dataloader_from_config(config=config)
+
+
 def main(args):
     cfg = Config(args)
     cfg = replace_test_ann_path(cfg)
@@ -108,6 +130,16 @@ def main(args):
     # Load data
     dataloader = get_dataset(cfg.config.datasets, cfg.config.run, args.task)
 
+    # Load Canary DataLoader
+    src_path = cfg.config.datasets.test_ann_path_asr if args.task == 'asr' else cfg.config.datasets.test_ann_path_aac
+    menifest_path = cfg.config.datasets.asr_manifest_path if args.task == 'asr' else cfg.config.datasets.aac_manifest_path
+    json_to_manifest(src_path, menifest_path)
+
+    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, menifest_path, cfg.config.run.batch_size_eval)
+
+    salmonn_preprocessor.speech_encoder._update_dataset_config(dataset_name='test', config=test_config)
+    salmonn_preprocessor.speech_encoder._test_dl = n_loader_test
+
     # need abs path in yaml
     with open(cfg.config.model.test_prompt_path, "r", encoding='utf-8') as f:
         test_prompt = json.load(f)
@@ -118,14 +150,20 @@ def main(args):
         testset_id = samples["testset_id"]
         testset_ids.extend(testset_id)
 
+        n_samples = next(n_loader_test._get_iterator())
+
         # Preprocess
         samples = prepare_sample(samples, cuda_enabled=torch.cuda.is_available())
         batch_size = samples["spectrogram"].shape[0]
-        spectrogram = samples["spectrogram"]
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
+
+        n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda:1')
+        raw_wav = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda:1')
+        audio_padding_mask = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda:1')
+
         speech_embeds, speech_atts = salmonn_preprocessor.encode_speech(
-            spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
+            n_samples, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
         )
 
         # Add prompt embeds + audio embed
@@ -185,7 +223,7 @@ def main(args):
         elif args.task == "aac":
             compute_spider(hyps, refs)
         os.makedirs("valid_results", exist_ok=True)
-        file_name = f"valid_results/{time.strftime('%Y-%m-%d_%H-%M-%S')}_{args.mode}.csv"
+        file_name = f"valid_results/{time.strftime('%Y%m%d_%H%M%S')}_{args.mode}.csv"
 
     result_df = pd.DataFrame({"testset_id": testset_ids, "text": hyps})
     result_df.to_csv(file_name, index=False)

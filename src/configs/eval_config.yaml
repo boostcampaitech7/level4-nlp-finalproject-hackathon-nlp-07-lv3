@@ -2,12 +2,14 @@ model:
   # paths
   llama_path: "meta-llama/Llama-3.2-3B-Instruct"
   whisper_path: "openai/whisper-large-v2"
-  beats_path: "" # 다운로드 받은 BEATs 파일 경로
+  beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"
+  canary_path : "nvidia/canary-1b"
 
   token: "" # 허깅페이스 토큰
   only_preprocessor: False
 
-  ckpt: "" # stage2 마친 모델 .ckpt or .pth
+  ckpt: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_2/202501221021/checkpoint_best.pth" # stage2 마친 모델 .ckpt or .pth
+  #ckpt: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_2/salmonn_3b_nota.pth" # stage2 마친 모델 .ckpt or .pth
 
   freeze_whisper: True
   freeze_beats: True
@@ -31,8 +33,8 @@ model:
 
   multi_prompt: True
   prompt_template: "USER: {}\nASSISTANT:"
-  prompt_path: "./prompts/train_prompt.json"
-  test_prompt_path: "./prompts/test_prompt.json"
+  prompt_path: "/data/ljm/test/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/train_prompt.json"
+  test_prompt_path: "/data/ljm/test/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/test_prompt.json"
   max_txt_len: 300
   end_sym: "<|end_of_text|>"   # 사용하는 LLM에 맞춰 변경
 
@@ -48,12 +50,16 @@ generate:
   end_sym: "<|end_of_text|>"
 
 datasets:
-  prefix: "./data"
-  test_ann_path_asr: "data/test_asr.json"
-  test_ann_path_aac: "data/test_aac.json"
+  prefix: "/data/data_storage"
+  test_ann_path_asr: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/test_asr.json"
+  test_ann_path_aac: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/test_aac.json"
+
+  asr_manifest_path: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/test_asr.jsonl"
+  aac_manifest_path: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/test_aac.jsonl"
+
   whisper_path: "openai/whisper-large-v2"
 
 run:
   batch_size_eval: 8
   num_workers: 4
-  device: "cuda"
+  device: "cuda:1"

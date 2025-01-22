@@ -77,19 +77,19 @@ class Runner:
         # model
         self._model = model
         self._model.to(self.device)
-        
+
         if self.use_distributed:
             self.model = DDP(self._model, device_ids=[self.config.config.run.gpu])
         else:
             self.model = self._model
 
         train_dataset = datasets["train"]
-        
+
         if "valid" in datasets.keys():
             valid_dataset = datasets["valid"]
-            
+
         else:
-            train_size = int(0.9995 * len(train_dataset))
+            train_size = int(0.9 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
 
             train_indices, valid_indices = random_split(
@@ -99,15 +99,15 @@ class Runner:
             valid_dataset = copy.deepcopy(train_dataset)
             train_dataset.annotation = [train_dataset.annotation[i] for i in train_indices]
             valid_dataset.annotation = [valid_dataset.annotation[i] for i in valid_indices]
-            
+
             # make temporary manifest file for train and validations
             assert(self.config.config.datasets.train_manifest_path != '')
             assert(self.config.config.datasets.valid_manifest_path != '')
-            
+
             json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.train_manifest_path, train_indices)
             json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.valid_manifest_path, valid_indices)
-        
-        
+
+
         test_dataset = datasets["test"] if "test" in datasets else None
 
         # 데이터로더 생성
@@ -120,13 +120,13 @@ class Runner:
         self.test_loader = get_dataloader(
             test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         ) if test_dataset else None
-        
+
         self.train_config, self.n_loader_train = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.train_manifest_path, self.config.config.run.batch_size_train)
         self.validation_config, self.n_loader_valid = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.valid_manifest_path, self.config.config.run.batch_size_eval)
-        
+
         self.model.speech_encoder._update_dataset_config(dataset_name='train', config=self.train_config)
         self.model.speech_encoder._train_dl = self.n_loader_train
-        
+
         self.model.speech_encoder._update_dataset_config(dataset_name='validation', config=self.validation_config)
         self.model.speech_encoder._validation_dl = self.n_loader_valid
 
@@ -157,7 +157,7 @@ class Runner:
     def get_dataloader_from_config(self, model : EncDecMultiTaskModel, manifet_path : str, batch_size, test_config : OmegaConf = None):
         if test_config:
             config = config
-        
+
         else:
             config = OmegaConf.create(
             dict(
@@ -170,7 +170,7 @@ class Runner:
                 use_lhotse = True,
             )
         )
-            
+
         return config, model._setup_dataloader_from_config(config=config)
 
 
@@ -202,7 +202,7 @@ class Runner:
 
             samples = next(self.train_loader)
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
-            
+
             n_samples = next(self.n_loader_train._get_iterator())
 
             if not self.dryrun:
@@ -266,7 +266,7 @@ class Runner:
         for samples in metric_logger.log_every(dataloader, self.config.config.run.log_freq, header=header):
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
             n_samples = next(self.n_loader_valid._get_iterator())
-            
+
             if not self.dryrun:
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     forward_result = model(samples, n_samples, verbose=True)
@@ -384,7 +384,7 @@ class Runner:
         # testing phase
         start, mid, end = 0, (self.start_epoch + self.max_epoch - 1) // 2, self.max_epoch - 1
         save_directory = ""
-        
+
         for cur_epoch in range(self.start_epoch, self.max_epoch):
             # training phase
             logging.info("Training Phase")

@@ -17,6 +17,8 @@ from config import Config
 from dataset import SALMONNDataset
 from models.salmonn import SALMONN
 from utils import get_dataloader, prepare_sample
+from models.json_to_manifest import json_to_manifest
+from models.modeling_canary import get_dataloader_from_config
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -96,13 +98,13 @@ def get_gpu_memory_usage():
     return gpu_memory
 
 
-def model_inference(cfg, samples, test_prompt, salmonn):
+def model_inference(cfg, samples, n_samples, test_prompt, salmonn):
     # TTFT
     start_time = time.time()
     llm = salmonn.llama_model
 
-    batch_size = samples["spectrogram"].shape[0]
-    spectrogram = samples["spectrogram"]
+    batch_size = n_samples['audio'].shape[0]
+    spectrogram = n_samples['audio']
     raw_wav = samples.get("raw_wav", None)
     audio_padding_mask = samples.get("padding_mask", None)
     speech_embeds, speech_atts = salmonn.encode_speech(
@@ -160,12 +162,19 @@ def main(args):
     llama_model, _ = load_model(salmonn_preprocessor)
     salmonn_preprocessor.llama_model = llama_model
 
+    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, "", cfg.config.run.batch_size_eval)
+
+    salmonn_preprocessor.speech_encoder._update_dataset_config(dataset_name='test', config=test_config)
+    salmonn_preprocessor.speech_encoder._test_dl = n_loader_test
+
     # Load dataset
-    with open("audiolm-trainer/prompts/test_prompt.json", "r") as f:
+    with open(cfg.config.model.test_prompt_path, "r", encoding='utf-8') as f:
         test_prompt = json.load(f)
     dataloader = MockDataset.make_mock_dataloader(cfg, sr=16000, audio_length=10)
     sample_batch = next(iter(dataloader))
     sample_batch = prepare_sample(sample_batch, cuda_enabled=torch.cuda.is_available())
+
+    n_samples = next(n_loader_test._get_iterator())
 
     # Measure memory and latency
     memory_usages = []
@@ -179,6 +188,7 @@ def main(args):
             inference_time, ttft, tpot = model_inference(
                 cfg,
                 sample_batch,
+                n_samples,
                 test_prompt,
                 salmonn_preprocessor,
             )
