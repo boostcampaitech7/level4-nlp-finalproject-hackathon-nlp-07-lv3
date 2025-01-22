@@ -97,7 +97,7 @@ class DistillDataCollatorForSeq2Seq:
         return batched_data
 
 def dynamic_kd_loss(student_logits, teacher_logits, temperature=1.0):
-    with torch.no_grad():   
+    with torch.no_grad():
         student_probs = F.softmax(student_logits, dim=-1)
         student_entropy = -torch.sum(student_probs * torch.log(student_probs + 1e-6), dim=-1) # student entropy, (bsz, )
         # normalized entropy score by student uncertainty:
@@ -116,19 +116,19 @@ def softmax_normalize(tensor, dim=-1):
 def minmax_normalize(tensor, dim=-1):
     min_vals, _ = torch.min(tensor, dim=dim, keepdim=True)
     max_vals, _ = torch.max(tensor, dim=dim, keepdim=True)
-    
+
     epsilon = 1e-8
     normalized_tensor = (tensor - min_vals) / (max_vals - min_vals + epsilon)
-    
+
     return normalized_tensor
 
 def standardize_tensor(tensor, dim=-1):
     mean_vals = torch.mean(tensor, dim=dim, keepdim=True)
     std_vals = torch.std(tensor, dim=dim, keepdim=True)
-    
+
     epsilon = 1e-8
     standardized_tensor = (tensor - mean_vals) / (std_vals + epsilon)
-    
+
     return standardized_tensor
 
 def dynamic_temperature(student_logits, teacher_logits, normalization_type=''):
@@ -159,7 +159,7 @@ def pad_logits(student_logits, teacher_logits, padding_value=-100):
     if student_size > teacher_size:
         teacher_logits = F.pad(teacher_logits, (0, 0, 0, pad_size))
     elif student_size < teacher_size:
-        student_logits = F.pad(student_logits, (0, 0, 0, pad_size)) 
+        student_logits = F.pad(student_logits, (0, 0, 0, pad_size))
     return student_logits, teacher_logits
 
 def read_teacher_outputs(teacher_output_path: str):
@@ -179,28 +179,52 @@ def encoder_kd_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature=1, st
         encoder_embeds_T = projection_layer(encoder_embeds_T)
     elif emd_s_size < emd_t_size:
         encoder_embeds_S = projection_layer(encoder_embeds_S)
-    
+
     if encoder_embeds_S.size(0) == 1:
         loss = kd_mse_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature)
     else:
         loss = contrastive_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature)
-    
+
     return loss
 
 def cosine_similarity(q_vec, c_vec):
     q_vec = q_vec / q_vec.norm(dim=1, keepdim=True)
     c_vec = c_vec / c_vec.norm(dim=1, keepdim=True)
-    return torch.mm(q_vec, c_vec.T)   
-    
+    return torch.mm(q_vec, c_vec.T)
+
 def contrastive_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature=1):
     L_i1 = -1 * torch.log(torch.exp(cosine_similarity(encoder_embeds_T, encoder_embeds_T) / scaling_temerature) / torch.sum(torch.exp(cosine_similarity(encoder_embeds_T, encoder_embeds_S) / scaling_temerature), dim=0))
     L_i2 = -1 * torch.log(torch.exp(cosine_similarity(encoder_embeds_T, encoder_embeds_T) / scaling_temerature) / torch.sum(torch.exp(cosine_similarity(encoder_embeds_S, encoder_embeds_T) / scaling_temerature), dim=0))
     L_contra = torch.mean(L_i1 + L_i2)
     return L_contra
 
+def KL_divergence_token_level(logits_S, logits_T, valid_mask, temperature=1.0):
+    """
+    logits_S, logits_T : (B, L, V)
+    valid_mask         : (B, L), 유효 토큰은 1, 패딩 토큰은 0
+    temperature        : distillation temperature
+    """
+    # (1) 소프트맥스 & 로그소프트맥스
+    p_T     = F.softmax(logits_T / temperature, dim=-1)       # (B, L, V)
+    log_p_T = F.log_softmax(logits_T / temperature, dim=-1)   # (B, L, V)
+    log_p_S = F.log_softmax(logits_S / temperature, dim=-1)   # (B, L, V)
+
+    # (2) KL = Σ p_T * (log_p_T - log_p_S)
+    kl_per_token = p_T * (log_p_T - log_p_S)  # (B, L, V)
+    kl_per_token = kl_per_token.sum(dim=-1)   # (B, L)
+
+    # (3) 유효 위치만 골라서(마스크 곱) 합산
+    kl_per_token = kl_per_token * valid_mask  # 패딩(0)은 0이 됨
+
+    # (4) 유효 토큰 개수로 평균
+    kl_loss = kl_per_token.sum() / (valid_mask.sum() + 1e-9)
+
+    # KD 논문에서 T^2를 곱해주는 관행이 있음
+    return kl_loss * (temperature ** 2)
+
 def KL_divergence(logits_S, logits_T, mask_S, mask_T, scaling_temperatures=1, padding_value=-100):
-    masked_logits_S = logits_S.masked_fill(mask_S == padding_value, float('-inf'))
-    masked_logits_T = logits_T.masked_fill(mask_T == padding_value, float('-inf'))
+    masked_logits_S = logits_S.masked_fill(mask_S == 0, float('-inf'))
+    masked_logits_T = logits_T.masked_fill(mask_T == 0, float('-inf'))
 
     teacher_probs = F.softmax(masked_logits_T / scaling_temperatures, dim=-1)
     student_log_probs = F.log_softmax(masked_logits_S / scaling_temperatures, dim=-1)

@@ -6,16 +6,17 @@ import torch.distributed as dist
 import torch.nn as nn
 import wandb
 
-from distillation.utils import (dynamic_kd_loss, 
-                                dynamic_temperature, 
-                                minmax_normalize, 
-                                softmax_normalize, 
-                                standardize_tensor, 
-                                pad_logits, 
-                                read_teacher_outputs, 
-                                custom_post_adaptor, 
+from distillation.utils import (dynamic_kd_loss,
+                                dynamic_temperature,
+                                minmax_normalize,
+                                softmax_normalize,
+                                standardize_tensor,
+                                pad_logits,
+                                read_teacher_outputs,
+                                custom_post_adaptor,
                                 encoder_kd_loss,
                                 KL_divergence,
+                                KL_divergence_token_level
                                 )
 # import pdb
 # from LLMPruner.peft import get_peft_model_state_dict
@@ -41,7 +42,7 @@ class CustomDistiller(GeneralDistiller):
                  layer_weight=0.1,
                  padding_value=-100
     ):
-        
+
         super(CustomDistiller, self).__init__(train_config, distill_config, model_T, model_S, adaptor_T, adaptor_S)
 
         self.global_step_start = global_step_start
@@ -54,12 +55,24 @@ class CustomDistiller(GeneralDistiller):
         # assert intermediate_normalization_type in ['','minmax','softmax'],"intermediate_normalization_type is not in ['','minmax','softmax']"
         self.padding_value = padding_value
         self.dynamic_kd_loss = dynamic_kd_loss
-        self.dynamic_temperature= dynamic_temperature 
+        self.dynamic_temperature= dynamic_temperature
         self.KL_divergence = KL_divergence
+        self.KL_divergence_token_level = KL_divergence_token_level
         self.encoder_kd_loss = encoder_kd_loss
+
         self.projs = []
         self.projs_group = []
         self.embeds_adaptor = embeds_adaptor
+
+        #         '''
+        #             /textbrewer/presets/PROJ_MAP
+        #             PROJ_MAP에 어떠한 projection이 가능한 다양한 레이어를 담아놓고 있음
+        #             예를 들어 teacher 와 student 간의 Hidden Size가 차이가 나서 이를 차원에 맞게 수정이 필요하여 projection을 위해서 nn.Linear을 사용하면
+        #             PROJ_MAP에 저장된 nn.Linear 방식을 사용해서 dim_in, dim_out을 활용해서 이를 선언
+        #             PROJ_MAP은 외부에서 선언되어서 가져온 값으로 새로 선언해서 만들 혹은 수정의 필요가 있음
+        #             여기서는 nn.Linear로 고정하되 추후에 projection 방법론 다양화에 따라서 따로 수정해서 진행 필요
+
+        #         '''
 
         # for im in self.d_config.intermediate_matches:
         #     if im.proj is not None:
@@ -67,17 +80,6 @@ class CustomDistiller(GeneralDistiller):
         #         dim_in = im.proj[1]
         #         dim_out = im.proj[2]
         #         self.projs_group.append(im.proj[3])
-
-        #         '''
-        #             /textbrewer/presets/PROJ_MAP 
-        #             PROJ_MAP에 어떠한 projection이 가능한 다양한 레이어를 담아놓고 있음
-        #             예를 들어 teacher 와 student 간의 Hidden Size가 차이가 나서 이를 차원에 맞게 수정이 필요하여 projection을 위해서 nn.Linear을 사용하면
-        #             PROJ_MAP에 저장된 nn.Linear 방식을 사용해서 dim_in, dim_out을 활용해서 이를 선언
-        #             PROJ_MAP은 외부에서 선언되어서 가져온 값으로 새로 선언해서 만들 혹은 수정의 필요가 있음
-        #             여기서는 nn.Linear로 고정하되 추후에 projection 방법론 다양화에 따라서 따로 수정해서 진행 필요
-                    
-        #         '''
-
         #         self.projs.append(PROJ_MAP[projection](dim_in, dim_out))
         #         self.projs[-1].to(self.t_config.device)
         #     else:
@@ -118,7 +120,7 @@ class CustomDistiller(GeneralDistiller):
         #     results_T = read_teacher_outputs(T_outputs_path)
         #     teacher_batch = batch_S
         #     student_batch = batch_S
-            
+
         # batch size: 4, teacher: llama-3b, student: llama-1b
         # print("teacher size: {}".format(results_T.logits.shape)) #teacher size: torch.Size([4, 166, 128257])
         # print("student size: {}".format(results_S.logits.shape)) # student size: torch.Size([4, 166, 128257])
@@ -132,7 +134,7 @@ class CustomDistiller(GeneralDistiller):
 
             def simple_adaptor(batch, model_outputs):
                 return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
-            
+
             post_adaptor 에서 해당 dict 값으로 반환값들을 파싱 후 후처리해서 반환 (각 value 를 list로 묶어서 반환)
 
         '''
@@ -148,7 +150,7 @@ class CustomDistiller(GeneralDistiller):
     def compute_loss(self, results_S, results_T, encoder_embeds_S, encoder_embeds_T, teacher_batch, student_batch):
         # logit-based feature-based cross-entropy loss의 각각의 값들을 저장
         losses_dict = dict()
-        
+
         total_loss = 0
 
         # Logit-Based
@@ -159,9 +161,9 @@ class CustomDistiller(GeneralDistiller):
             if self.kd_type == 'original_kd' and self.use_softmax:
                 logits_list_T = F.softmax(logits_list_T[0], dim=-1)
                 logits_list_S = F.softmax(logits_list_S[0], dim=-1)
-            
+
             total_kd_loss = 0
-            
+
             '''
             textbrewer/distiller_utils/select_logits_with_mask
             select_logits_with_mask 에서 attention_mask 을 활용해서 Logits 값 중에서 유효한 값들만 남김
@@ -175,7 +177,7 @@ class CustomDistiller(GeneralDistiller):
 
             '''
             textbrewer/distiller_utils/probability_shift_
-            tensor 내부에서 dim 별로 가장 높은 값을 찾아서 해당 값들을 정답이 되는 label 이 되는 값들과 바꾸어서 
+            tensor 내부에서 dim 별로 가장 높은 값을 찾아서 해당 값들을 정답이 되는 label 이 되는 값들과 바꾸어서
             teacher-forcing 느낌으로 l_T의 logits 중 정답에 해당 하는 값들이 가장 높게 고정 시킴
             '''
             if self.d_config.probability_shift is True:
@@ -189,9 +191,9 @@ class CustomDistiller(GeneralDistiller):
                         l_S = logits_layer(l_S)
 
                     l_S, l_T = pad_logits(l_S, l_T, self.padding_value)
-                    mask_S = (l_S != self.padding_value).float()
-                    mask_T = (l_T != self.padding_value).float()
-
+                    mask_S = (l_S != self.padding_value).any(dim=-1).float()
+                    mask_T = (l_T != self.padding_value).any(dim=-1).float()
+                    valid_mask = mask_S * mask_T
 
                     if self.d_config.temperature_scheduler is not None:
                         temperature = self.d_config.temperature_scheduler(l_S, l_T, self.d_config.temperature)
@@ -201,9 +203,11 @@ class CustomDistiller(GeneralDistiller):
                         total_kd_loss += self.kd_loss(l_S, l_T, temperature) # AbstractDistiller: self.kd_loss = KD_LOSS_MAP[self.d_config.kd_loss_type]
                     elif self.kd_type == 'dynamic_kd':
                         total_kd_loss += self.dynamic_kd_loss(l_S, l_T, temperature)
+                    elif self.kd_type == 'dynamic_temperature':
+                        total_kd_loss += self.dynamic_temperature(l_S, l_T,self.normalization_type)
                     elif self.kd_type == 'kl_divergence':
-                        total_kd_loss += self.KL_divergence(l_S, l_T, mask_S, mask_T, padding_value=self.padding_value)
-                
+                        total_kd_loss += self.KL_divergence_token_level(l_S, l_T, valid_mask, temperature) #self.KL_divergence(l_S, l_T, mask_S, mask_T, padding_value=self.padding_value)
+
             else:
                 for l_T, l_S in zip(logits_list_T, logits_list_S):
                     l_T, l_S = l_T.to(self.t_config.device), l_S.to(self.t_config.device)
@@ -212,14 +216,15 @@ class CustomDistiller(GeneralDistiller):
                         l_S = logits_layer(l_S)
 
                     l_S, l_T = pad_logits(l_S, l_T, self.padding_value)
-                    mask_S = (l_S != self.padding_value).float()
-                    mask_T = (l_T != self.padding_value).float()
+                    mask_S = (l_S != self.padding_value).any(dim=-1).float()
+                    mask_T = (l_T != self.padding_value).any(dim=-1).float()
+                    valid_mask = mask_S * mask_T
 
                     if self.d_config.temperature_scheduler is not None:
                         temperature = self.d_config.temperature_scheduler(l_S, l_T, self.d_config.temperature)
                     else:
                         temperature = self.d_config.temperature
-                    
+
                     if self.kd_type == 'original_kd':
                         total_kd_loss += self.kd_loss(l_S, l_T, temperature) # AbstractDistiller: self.kd_loss = KD_LOSS_MAP[self.d_config.kd_loss_type]
                     elif self.kd_type == 'dynamic_kd':
@@ -227,15 +232,15 @@ class CustomDistiller(GeneralDistiller):
                     elif self.kd_type == 'dynamic_temperature':
                         total_kd_loss += self.dynamic_temperature(l_S, l_T,self.normalization_type)
                     elif self.kd_type == 'kl_divergence':
-                        total_kd_loss += self.KL_divergence(l_S, l_T, mask_S, mask_T, padding_value=self.padding_value)
-                        
+                        total_kd_loss += self.KL_divergence_token_level(l_S, l_T, valid_mask, temperature) #self.KL_divergence(l_S, l_T, mask_S, mask_T, padding_value=self.padding_value)
+
             losses_dict['logit_based_kd_loss'] = total_kd_loss
 
         # Encoder KD
         # if 'embeds' in encoder_embeds_T and 'embeds' in encoder_embeds_T:
         #     embeds_list_T = encoder_embeds_T['embeds']
         #     embeds_list_S = encoder_embeds_S['embeds']
-            
+
         total_enkd_loss = 0
 
         encoder_embeds_S, encoder_embeds_T = encoder_embeds_S.to(self.t_config.device), encoder_embeds_T.to(self.t_config.device)
@@ -288,7 +293,7 @@ class CustomDistiller(GeneralDistiller):
         #         elif self.intermediate_normalization_type=='standardize':
         #             inter_S= standardize_tensor(inter_S)
         #             inter_T= standardize_tensor(inter_T)
-            
+
         #     intermediate_loss = match_loss(inter_S, inter_T, mask=inputs_mask_S)
         #     total_loss += intermediate_loss * match_weight
         #     losses_dict[f'unweighted_{feature}_{loss_type}_{name_S}_{name_T}'] = intermediate_loss
@@ -315,7 +320,7 @@ class CustomDistiller(GeneralDistiller):
         total_loss += losses_dict['logit_based_kd_loss'] * alpha_1 if 'logit_based_kd_loss' in losses_dict else 0
         total_loss += losses_dict['Encoder_embeds_based_kd_loss'] * alpha_2 if 'Encoder_embeds_based_kd_loss' in losses_dict else 0
         total_loss += losses_dict['Cross_Entropy_output_loss'] * alpha_3 if 'Cross_Entropy_output_loss' in losses_dict else 0
-        
+
         formated_losses_dict={}
         for key, value in losses_dict.items():
             if isinstance(value, torch.Tensor):
