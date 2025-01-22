@@ -400,6 +400,8 @@ class SALMONN(nn.Module):
         speech_embeds, speech_atts = self.encode_speech(
             spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
         )
+        if self.distillation:
+            encoder_embeds = speech_embeds
 
         # wrap speech_embeds with prompts
         # LLM instruction을 위한 prompt와 결합
@@ -470,7 +472,8 @@ class SALMONN(nn.Module):
             loss = outputs.loss
         
         if self.distillation:
-            return outputs
+            decoder_outputs = outputs
+            return decoder_outputs, encoder_embeds
 
         if verbose:
             nvocab = self.llama_model.config.vocab_size

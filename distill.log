@@ -403,3 +403,17 @@
 2025-01-21 18:55:42,852 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 15.578250885009766, 'unweighted_hard_label_loss': 8.035002708435059}
 2025-01-21 18:55:45,078 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 16.086528778076172, 'unweighted_hard_label_loss': 8.050286293029785}
 2025-01-22 01:33:34,207 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 20.196870803833008, 'unweighted_hard_label_loss': 8.180362701416016}
+2025-01-22 10:38:05,656 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 20.196870803833008, 'unweighted_hard_label_loss': 8.180362701416016}
+2025-01-22 10:38:07,663 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 21.311969757080078, 'unweighted_hard_label_loss': 8.009746551513672}
+2025-01-22 10:38:20,161 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 12.643653869628906, 'unweighted_hard_label_loss': 6.798678874969482}
+2025-01-22 10:38:22,061 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 13.747475624084473, 'unweighted_hard_label_loss': 6.496236801147461}
+2025-01-22 18:05:30,557 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 20.196870803833008, 'unweighted_hard_label_loss': 8.180362701416016}
+2025-01-22 18:05:33,087 - distillation.CustomDistiller - INFO - {'unweighted_kd_loss': 21.311969757080078, 'unweighted_hard_label_loss': 8.009746551513672}
+2025-01-22 23:19:47,749 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 20.196870803833008, 'Encoder_embeds_based_kd_loss': 0.8115129470825195, 'Cross_Entropy_output_loss': 8.180362701416016}
+2025-01-22 23:19:50,210 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 21.227895736694336, 'Encoder_embeds_based_kd_loss': 0.8044706583023071, 'Cross_Entropy_output_loss': 7.970142841339111}
+2025-01-22 23:20:04,107 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 12.300650596618652, 'Encoder_embeds_based_kd_loss': 0.7994636297225952, 'Cross_Entropy_output_loss': 6.1515679359436035}
+2025-01-22 23:20:05,837 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 17.187973022460938, 'Encoder_embeds_based_kd_loss': 0.7922499775886536, 'Cross_Entropy_output_loss': 6.34486722946167}
+2025-01-23 00:24:25,411 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 18881.2890625, 'Encoder_embeds_based_kd_loss': 0.8115129470825195, 'Cross_Entropy_output_loss': 8.180362701416016}
+2025-01-23 00:24:27,693 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 20863.154296875, 'Encoder_embeds_based_kd_loss': 0.8044572472572327, 'Cross_Entropy_output_loss': 7.940502166748047}
+2025-01-23 00:24:40,984 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 59565.59765625, 'Encoder_embeds_based_kd_loss': 0.7995242476463318, 'Cross_Entropy_output_loss': 6.041084289550781}
+2025-01-23 00:24:42,674 - distillation.CustomDistiller - INFO - {'logit_based_kd_loss': 51516.70703125, 'Encoder_embeds_based_kd_loss': 0.7920896410942078, 'Cross_Entropy_output_loss': 6.186854362487793}

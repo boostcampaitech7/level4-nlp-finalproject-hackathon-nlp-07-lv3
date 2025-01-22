@@ -184,10 +184,10 @@ class DistillRunner:
                 samples_T = copy.deepcopy(samples_S)
                 samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
                 samples_T = prepare_sample(samples_T, cuda_enabled=self.cuda_enabled, device=self.device2)
-            else:
-                samples_S = next(self.train_loader)
-                samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
-                samples_T = None
+            # else:
+            #     samples_S = next(self.train_loader)
+            #     samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
+            #     samples_T = None
             
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
@@ -195,9 +195,9 @@ class DistillRunner:
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     if self.model_T is not None:
                         loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
-                    else:
-                        teacher_output_path = os.path.join(self.teacher_output_path, f"{self.lm_path}_{self.stage_path}_{total_cnt}.safetensors")
-                        loss, _ = self.distiller.train_on_batch(samples_S, samples_T, teacher_output_path)
+                    # else:
+                    #     teacher_output_path = os.path.join(self.teacher_output_path, f"{self.lm_path}_{self.stage_path}_{total_cnt}.safetensors")
+                    #     loss, _ = self.distiller.train_on_batch(samples_S, samples_T, teacher_output_path)
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()

@@ -64,9 +64,6 @@ def setup_seeds(config):
 
     return seed
 
-def simple_adaptor(batch, model_outputs):
-    return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
-
 def main():
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
     job_id = now()
@@ -127,6 +124,14 @@ def main():
             "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
         }
 
+    
+    def simple_adaptor(batch, model_outputs):
+        return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
+
+    
+    def simple_embeds_adaptor(batch, encoder_embeds):
+        return {'embeds': encoder_embeds}
+
     # build model
     if not args.dryrun:
         if model_T_config.is_output_saved:
@@ -137,13 +142,14 @@ def main():
         distiller = CustomDistiller(
                         train_config=TrainingConfig(),
                         distill_config=DistillationConfig(
-                            hard_label_weight=0.5,
-                            kd_loss_weight=0.5
+                            # hard_label_weight=0.5,
+                            # kd_loss_weight=0.5
                         ),
                         model_T=model_T, 
                         model_S=model_S, 
                         adaptor_T=simple_adaptor, 
                         adaptor_S=simple_adaptor,
+                        embeds_adaptor=simple_embeds_adaptor,
                         logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
                         global_step_start=0,
                         use_softmax=True,
