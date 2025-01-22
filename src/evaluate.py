@@ -135,7 +135,7 @@ def main(args):
     menifest_path = cfg.config.datasets.asr_manifest_path if args.task == 'asr' else cfg.config.datasets.aac_manifest_path
     json_to_manifest(src_path, menifest_path)
 
-    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, menifest_path, cfg.config.run.batch_size_eval)
+    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, menifest_path, bath_size=cfg.config.run.batch_size_eval)
 
     salmonn_preprocessor.speech_encoder._update_dataset_config(dataset_name='test', config=test_config)
     salmonn_preprocessor.speech_encoder._test_dl = n_loader_test

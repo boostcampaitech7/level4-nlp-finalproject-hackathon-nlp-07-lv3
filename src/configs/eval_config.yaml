@@ -57,6 +57,8 @@ datasets:
   asr_manifest_path: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/test_asr.jsonl"
   aac_manifest_path: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/test_aac.jsonl"
 
+  mock_manifest_path: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/mock_audio.jsonl"
+
   whisper_path: "openai/whisper-large-v2"
 
 run:

@@ -103,12 +103,11 @@ def model_inference(cfg, samples, n_samples, test_prompt, salmonn):
     start_time = time.time()
     llm = salmonn.llama_model
 
-    batch_size = n_samples['audio'].shape[0]
-    spectrogram = n_samples['audio']
+    batch_size = n_samples.audio.shape[0]
     raw_wav = samples.get("raw_wav", None)
     audio_padding_mask = samples.get("padding_mask", None)
     speech_embeds, speech_atts = salmonn.encode_speech(
-        spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
+        n_samples, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
     )
 
     prompts = [test_prompt[task] for task in samples["task"]]
@@ -162,7 +161,7 @@ def main(args):
     llama_model, _ = load_model(salmonn_preprocessor)
     salmonn_preprocessor.llama_model = llama_model
 
-    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, "", cfg.config.run.batch_size_eval)
+    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, cfg.config.datasets.mock_manifest_path, batch_size=cfg.config.run.batch_size_eval)
 
     salmonn_preprocessor.speech_encoder._update_dataset_config(dataset_name='test', config=test_config)
     salmonn_preprocessor.speech_encoder._test_dl = n_loader_test
@@ -175,6 +174,10 @@ def main(args):
     sample_batch = prepare_sample(sample_batch, cuda_enabled=torch.cuda.is_available())
 
     n_samples = next(n_loader_test._get_iterator())
+
+    n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda:1')
+    sample_batch["raw_wav"] = salmonn_preprocessor.move_data_to_device(sample_batch["raw_wav"], 'cuda:1')
+    sample_batch["padding_mask"] = salmonn_preprocessor.move_data_to_device(sample_batch["padding_mask"], 'cuda:1')
 
     # Measure memory and latency
     memory_usages = []

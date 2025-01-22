@@ -121,8 +121,8 @@ class Runner:
             test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         ) if test_dataset else None
 
-        self.train_config, self.n_loader_train = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.train_manifest_path, self.config.config.run.batch_size_train)
-        self.validation_config, self.n_loader_valid = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.valid_manifest_path, self.config.config.run.batch_size_eval)
+        self.train_config, self.n_loader_train = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.train_manifest_path, batch_size=self.config.config.run.batch_size_train)
+        self.validation_config, self.n_loader_valid = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.valid_manifest_path, batch_size=self.config.config.run.batch_size_eval)
 
         self.model.speech_encoder._update_dataset_config(dataset_name='train', config=self.train_config)
         self.model.speech_encoder._train_dl = self.n_loader_train

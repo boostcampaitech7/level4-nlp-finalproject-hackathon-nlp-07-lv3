@@ -68,7 +68,7 @@ def move_data_to_device(inputs: Any, device: Union[str, torch.device], non_block
     else:
         return inputs
 
-def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str, test_config : OmegaConf = None, transcribe_cfg: TranscribeConfig = None):
+def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str, test_config : OmegaConf = None, transcribe_cfg: TranscribeConfig = None, batch_size: int = 2):
     if test_config:
         config = config
 
@@ -78,7 +78,7 @@ def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str,
             manifest_filepath=manifet_path,
             sample_rate=16000,
             labels=None,
-            batch_size=2,
+            batch_size=batch_size,
             shuffle=False,
             time_length=30,
             use_lhotse = True,
