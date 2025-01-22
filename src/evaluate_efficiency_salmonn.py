@@ -4,9 +4,11 @@ import json
 import os
 import subprocess
 import time
+import random
 
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 from tqdm import tqdm
 from transformers import DynamicCache, WhisperFeatureExtractor
 
@@ -17,6 +19,21 @@ from utils import get_dataloader, prepare_sample
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
+def set_seed(seed: int):
+    """재현성을 위한 시드 설정."""
+    random.seed(seed)  # Python 내장 random 모듈에 시드 설정
+    np.random.seed(seed)  # NumPy 난수 생성기 시드 설정
+    torch.manual_seed(seed)  # PyTorch CPU 연산에 시드 설정
+    if torch.cuda.is_available():  # GPU가 사용 가능하면 GPU 시드도 설정
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # 여러 GPU에서 시드 설정
+    torch.backends.cudnn.deterministic = True  # cuDNN에서 결정론적 연산 강제
+    torch.backends.cudnn.benchmark = False  # 성능 최적화 비활성화 (결정론적 결과 보장)
+    torch.set_num_threads(1)  # 멀티스레딩 환경에서의 일관성 확보를 위해 CPU 스레드를 1로 제한
+    mp.set_start_method('spawn', force=True)  # 멀티프로세싱 시작 방식 설정
+
 
 
 def load_model(salmonn_preprocessor):
@@ -148,6 +165,10 @@ def model_inference(cfg, samples, test_prompt, salmonn):
 
 
 def main(args):
+
+    seed = 42
+    set_seed(seed)  # 시드 설정
+
     cfg = Config(args)
 
     print("Force batch size as 1")
