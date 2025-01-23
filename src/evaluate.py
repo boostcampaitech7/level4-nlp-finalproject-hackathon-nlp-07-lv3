@@ -12,6 +12,7 @@ from tqdm import tqdm
 from config import Config
 from metrics import compute_spider, compute_wer
 from salmonn_utils import SALMONNTestDataset, load_model, load_preprocessor
+from models.modeling_canary import get_transcribe_config
 from utils import get_dataloader, prepare_sample
 from models.json_to_manifest import json_to_manifest
 
@@ -108,6 +109,7 @@ def get_dataloader_from_config(model, manifet_path : str, batch_size, test_confi
         dict(
             manifest_filepath=manifet_path,
             sample_rate=16000,
+            channel_selector=0,
             labels=None,
             batch_size=batch_size,
             shuffle=False,
@@ -135,7 +137,11 @@ def main(args):
     menifest_path = cfg.config.datasets.asr_manifest_path if args.task == 'asr' else cfg.config.datasets.aac_manifest_path
     json_to_manifest(src_path, menifest_path)
 
-    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, menifest_path, bath_size=cfg.config.run.batch_size_eval)
+    test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, menifest_path, batch_size=cfg.config.run.batch_size_eval)
+
+
+    transcribe_cfg = get_transcribe_config(menifest_path, batch_size=cfg.config.run.batch_size_eval)
+    salmonn_preprocessor.speech_encoder._transcribe_on_begin(menifest_path, transcribe_cfg)
 
     salmonn_preprocessor.speech_encoder._update_dataset_config(dataset_name='test', config=test_config)
     salmonn_preprocessor.speech_encoder._test_dl = n_loader_test

@@ -195,7 +195,7 @@ def main(args):
                 salmonn_preprocessor,
             )
         torch.cuda.synchronize()
-        after_memory_allocated = torch.cuda.max_memory_allocated()
+        after_memory_allocated = torch.cuda.max_memory_allocated(device='cuda:1')
 
         torch.cuda.empty_cache()  # Clear the cache to get more accurate measurements
         gc.collect()

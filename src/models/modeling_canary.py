@@ -19,7 +19,7 @@ except ImportError:
 @dataclass
 class InternalTranscribeConfig:
     # Internal values
-    device: Optional[torch.device] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device: Optional[torch.device] = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     dtype: Optional[torch.dtype] = None
     training_mode: bool = False
     logging_level: Optional[Any] = None
@@ -39,7 +39,7 @@ class TranscribeConfig:
     batch_size: int = 4
     return_hypotheses: bool = False
     num_workers: Optional[int] = None
-    channel_selector: ChannelSelectorType = 'average'
+    channel_selector: ChannelSelectorType = 0
     augmentor: Optional[DictConfig] = None
     timestamps: Optional[bool] = None  # returns timestamps for each word and segments if model supports punctuations
     verbose: bool = True
@@ -88,20 +88,33 @@ def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str,
 
     return config, model._setup_dataloader_from_config(config=config)
 
-def get_transcribe_config(transcribe_cfg: TranscribeConfig = None):
+def get_transcribe_config(manifest_filepath, batch_size, transcribe_cfg: TranscribeConfig = None):
     if transcribe_cfg:
         transcribe_cfg = transcribe_cfg
 
     else:
         transcribe_cfg = TranscribeConfig(
-            batch_size=2,
+            batch_size=batch_size,
             return_hypotheses=False,
             num_workers=0,
             channel_selector=0,
             augmentor=None,
             verbose=True,
             timestamps=None,
-            _internal=InternalTranscribeConfig(),
+            _internal=InternalTranscribeConfig(
+                device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu"),
+                dtype = None,
+                training_mode = False,
+                logging_level = None,
+
+                # Preprocessor values
+                dither_value = 0.0,
+                pad_to_value = 0,
+
+                # Scratch space
+                temp_dir = None,
+                manifest_filepath = manifest_filepath,
+            ),
         )
 
     return transcribe_cfg
