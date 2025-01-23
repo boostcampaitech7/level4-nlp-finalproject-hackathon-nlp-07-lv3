@@ -17,7 +17,6 @@ from config import Config
 from dataset import SALMONNDataset
 from models.salmonn import SALMONN
 from utils import get_dataloader, prepare_sample
-from models.json_to_manifest import json_to_manifest
 from models.modeling_canary import get_dataloader_from_config
 
 
