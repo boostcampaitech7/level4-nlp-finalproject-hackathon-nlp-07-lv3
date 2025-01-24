@@ -40,7 +40,7 @@ class CustomDistiller(GeneralDistiller):
                  kd_type : Optional[str] = "kl_divergence",
                  intermediate_control_config='',
                  layer_weight=0.1,
-                 padding_value=-100
+                 padding_value=0
     ):
 
         super(CustomDistiller, self).__init__(train_config, distill_config, model_T, model_S, adaptor_T, adaptor_S)
@@ -245,7 +245,7 @@ class CustomDistiller(GeneralDistiller):
 
         encoder_embeds_S, encoder_embeds_T = encoder_embeds_S.to(self.t_config.device), encoder_embeds_T.to(self.t_config.device)
         total_enkd_loss = self.encoder_kd_loss(encoder_embeds_S, encoder_embeds_T)
-        losses_dict['Encoder_embeds_based_kd_loss'] = total_enkd_loss
+        losses_dict['encoder_embeds_based_kd_loss'] = total_enkd_loss
 
         # Feature-Based
         # inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
@@ -304,22 +304,24 @@ class CustomDistiller(GeneralDistiller):
             for loss in results_S['losses']:
                 # in case of multi-GPU
                 total_hl_loss += loss.mean()
-            losses_dict['Cross_Entropy_output_loss'] = total_hl_loss
+            losses_dict['cross_entropy_output_loss'] = total_hl_loss
 
-        # 동적 가중치 계산
-        alpha_1 = 1 / (losses_dict['logit_based_kd_loss'] + 1e-8) if 'logit_based_kd_loss' in losses_dict else 0
-        alpha_2 = 1 / (losses_dict['Encoder_embeds_based_kd_loss'] + 1e-8) if 'Encoder_embeds_based_kd_loss' in losses_dict else 0
-        alpha_3 = 1 / (losses_dict['Cross_Entropy_output_loss'] + 1e-8) if 'Cross_Entropy_output_loss' in losses_dict else 0
+        # # 동적 가중치 계산
+        # alpha_1 = 1 / (losses_dict['logit_based_kd_loss'] + 1e-8) if 'logit_based_kd_loss' in losses_dict else 0
+        # alpha_2 = 1 / (losses_dict['encoder_embeds_based_kd_loss'] + 1e-8) if 'encoder_embeds_based_kd_loss' in losses_dict else 0
+        # alpha_3 = 1 / (losses_dict['cross_entropy_output_loss'] + 1e-8) if 'cross_entropy_output_loss' in losses_dict else 0
 
-        # 정규화
-        total_alpha = alpha_1 + alpha_2 + alpha_3
-        alpha_1 /= total_alpha
-        alpha_2 /= total_alpha
-        alpha_3 /= total_alpha
+        # # 정규화
+        # total_alpha = alpha_1 + alpha_2 + alpha_3
+        # alpha_1 /= total_alpha
+        # alpha_2 /= total_alpha
+        # alpha_3 /= total_alpha
 
-        total_loss += losses_dict['logit_based_kd_loss'] * alpha_1 if 'logit_based_kd_loss' in losses_dict else 0
-        total_loss += losses_dict['Encoder_embeds_based_kd_loss'] * alpha_2 if 'Encoder_embeds_based_kd_loss' in losses_dict else 0
-        total_loss += losses_dict['Cross_Entropy_output_loss'] * alpha_3 if 'Cross_Entropy_output_loss' in losses_dict else 0
+        # total_loss += losses_dict['logit_based_kd_loss'] * alpha_1 if 'logit_based_kd_loss' in losses_dict else 0
+        # total_loss += losses_dict['encoder_embeds_based_kd_loss'] * alpha_2 if 'encoder_embeds_based_kd_loss' in losses_dict else 0
+        # total_loss += losses_dict['cross_entropy_output_loss'] * alpha_3 if 'cross_entropy_output_loss' in losses_dict else 0
+
+        total_loss =  losses_dict['cross_entropy_output_loss'] #0.1 * losses_dict['logit_based_kd_loss'] + 0.9 * losses_dict['cross_entropy_output_loss']
 
         formated_losses_dict={}
         for key, value in losses_dict.items():
