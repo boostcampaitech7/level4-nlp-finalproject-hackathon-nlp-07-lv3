@@ -7,7 +7,7 @@ model:
   token: "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"    # 허깅페이스 토큰
   only_preprocessor: False
 
-  ckpt: "/data/pgt/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_2/202501230145/checkpoint_best.pth" # stage2 마친 모델 .ckpt or .pth
+  ckpt: "/data/pgt/level4-nlp-finalproject-hackathon-nlp-07-lv3/saved_models/salmonn_7b_v0.pth" #"/data/pgt/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_2/202501250251/checkpoint_best.pth" # stage2 마친 모델 .ckpt or .pth
 
   freeze_whisper: True
   freeze_beats: True
@@ -34,7 +34,7 @@ model:
   prompt_path: "./src/prompts/train_prompt.json"
   test_prompt_path: "./src/prompts/test_prompt.json"
   max_txt_len: 300
-  end_sym: "<|end_of_text|>"   # 사용하는 LLM에 맞춰 변경
+  end_sym: "</s>" #"<|end_of_text|>"   # 사용하는 LLM에 맞춰 변경
 
 generate:
   max_new_tokens: 200
@@ -45,7 +45,7 @@ generate:
   top_p: 0.9
   repetition_penalty: 1.0
   length_penalty: 1.0
-  end_sym: "<|end_of_text|>"
+  end_sym: "</s>" #"<|end_of_text|>"
 
 datasets:
   prefix: "../../data_storage"
@@ -56,4 +56,4 @@ datasets:
 run:
   batch_size_eval: 8
   num_workers: 4
-  device: "cuda"
+  device: "cuda:1"

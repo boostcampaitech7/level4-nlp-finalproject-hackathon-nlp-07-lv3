@@ -18,6 +18,7 @@ logs/
 
 # 데이터셋(대용량 이므로 불포함)
 data/
+src/data
 
 # IDE 설정 파일
 .vscode/
@@ -36,3 +37,6 @@ Thumbs.db
 # 개인 설정값 무시
 *.yaml
 *.yml
+
+# 외부 라이브러리
+src/Multi_Level_OT_main

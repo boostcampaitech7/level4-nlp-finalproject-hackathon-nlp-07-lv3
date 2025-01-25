@@ -434,6 +434,7 @@ class SALMONN(nn.Module):
         )
         # 마찬가지로 오디오 인코더에서 들어온 값들은 LLM이 출력하는 값이 아니기에 여기도 Loss 계산 시에 무시하기 위해서
         # 오디오 인코더 길이 만큼의 -100 으로 마스킹 처리
+        # (일반적인 llM에 대한 KD 을 진행 시에는 같은 text을 사용하기에 모델과 토큰나이저가 차이가 나도 기본적으로 seq 길어는 같기에 최종 output에 대한 seq는 같다고 가정하고 길이를 맞추기 위한 padding은 필요가 없으나 ALM에서는 나오는 인코더의 종류와 가중치에 따라서 해당 결과물의 길이도 변화하기에 유동적이라 같은 LLM을 사용하고 있더라도 차이가 생길 수 있기에 padding은 필수적)
         empty_targets = (
             torch.ones([speech_atts.shape[0], speech_atts.shape[1] + 1], dtype=torch.long)
             .to(spectrogram.device)
@@ -472,8 +473,7 @@ class SALMONN(nn.Module):
             loss = outputs.loss
         
         if self.distillation:
-            decoder_outputs = outputs
-            return decoder_outputs, encoder_embeds
+            return outputs, encoder_embeds, targets
 
         if verbose:
             nvocab = self.llama_model.config.vocab_size

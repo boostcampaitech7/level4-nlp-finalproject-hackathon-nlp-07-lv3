@@ -22,8 +22,9 @@ from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
 
+
 class DistillRunner:
-    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED, teacher_output_dir:str=""):
+    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED, teacher_output_dir:str="", is_multi_level_OT=False):
         self.seed = SEED
         self.config = cfg
         self.model_config = cfg.config.model_T
@@ -31,6 +32,9 @@ class DistillRunner:
 
         # dryrun (test with dummy model)
         self.dryrun = dryrun
+
+        # loss
+        self.is_multi_level_OT = is_multi_level_OT
 
         # log
         self.output_dir = Path(self.config.config.run.output_dir) / job_id
@@ -184,20 +188,25 @@ class DistillRunner:
                 samples_T = copy.deepcopy(samples_S)
                 samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
                 samples_T = prepare_sample(samples_T, cuda_enabled=self.cuda_enabled, device=self.device2)
-            # else:
-            #     samples_S = next(self.train_loader)
-            #     samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
-            #     samples_T = None
+            else:
+                samples_S = next(self.train_loader)
+                samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
+                samples_T = None
             
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     if self.model_T is not None:
-                        loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
-                    # else:
-                    #     teacher_output_path = os.path.join(self.teacher_output_path, f"{self.lm_path}_{self.stage_path}_{total_cnt}.safetensors")
-                    #     loss, _ = self.distiller.train_on_batch(samples_S, samples_T, teacher_output_path)
+                        if self.is_multi_level_OT:
+                            output_T, encoder_output_T, targets_T = self.model_T(samples_T)
+                            output_S, encoder_output_S, targets_S = self.model_S(samples_S)
+                            loss = self.distiller.train_on_batch(epoch, output_T, output_S, targets_T, targets_S, encoder_output_T, encoder_output_S, device=self.device)
+                        else:
+                            loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
+                    else:
+                        teacher_output_path = os.path.join(self.teacher_output_path, f"{self.lm_path}_{self.stage_path}_{total_cnt}.safetensors")
+                        loss, _ = self.distiller.train_on_batch(samples_S, samples_T, teacher_output_path)
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
@@ -233,9 +242,6 @@ class DistillRunner:
                 if global_rank == 0:
                     wandb.log({"train/iteration": i, "train/loss": 0.0, "train/lr": 0.0})
             total_cnt += 1
-            # del samples_S, samples_T
-            # gc.collect()
-            # torch.cuda.empty_cache()
 
         metric_logger.synchronize_between_processes()
         logging.info("Averaged stats: " + str(metric_logger.global_avg()))

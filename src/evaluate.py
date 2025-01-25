@@ -118,7 +118,7 @@ def main(args):
         testset_ids.extend(testset_id)
 
         # Preprocess
-        samples = prepare_sample(samples, cuda_enabled=torch.cuda.is_available())
+        samples = prepare_sample(samples, cuda_enabled=torch.cuda.is_available(), device=cfg.config.run.device)
         batch_size = samples["spectrogram"].shape[0]
         spectrogram = samples["spectrogram"]
         raw_wav = samples.get("raw_wav", None)

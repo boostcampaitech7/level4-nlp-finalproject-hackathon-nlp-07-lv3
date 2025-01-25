@@ -1,9 +1,8 @@
-from .CustomDistiller import CustomDistiller
+from .CustomDistiller import CustomDistiller, CustomDistiller2
 from .utils import (
-    DistillDataCollatorForSeq2Seq,
-    dynamic_kd_loss,
     softmax_normalize,
     minmax_normalize,
     standardize_tensor,
     dynamic_temperature,
 )
+from .losses import dynamic_kd_loss, encoder_kd_loss, KL_divergence, KL_divergence_token_level

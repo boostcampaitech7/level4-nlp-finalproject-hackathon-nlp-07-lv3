@@ -30,7 +30,7 @@ from models import load_model
 from textbrewer import TrainingConfig, DistillationConfig
 from utils import setup_logger
 from distill_runner import DistillRunner
-from distillation import CustomDistiller
+from distillation import CustomDistiller, CustomDistiller2
 
 def now():
     seoul_tz = pytz.timezone("Asia/Seoul")
@@ -125,13 +125,12 @@ def main():
         }
 
     
-    def simple_adaptor(batch, model_outputs):
+    def simple_adaptor(model_outputs, batch=None):
         return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
 
+    def simple_adaptor2(model_outputs, batch=None):
+        return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'loss': model_outputs.loss}
     
-    def simple_embeds_adaptor(batch, encoder_embeds):
-        return {'embeds': encoder_embeds}
-
     # build model
     if not args.dryrun:
         if model_T_config.is_output_saved:
@@ -139,27 +138,33 @@ def main():
         else:
             model_T = load_model(model_T_config)
         model_S = load_model(model_S_config)
-        distiller = CustomDistiller(
-                        train_config=TrainingConfig(),
-                        distill_config=DistillationConfig(
-                            # hard_label_weight=0.5,
-                            # kd_loss_weight=0.5
-                        ),
-                        model_T=model_T, 
-                        model_S=model_S, 
-                        adaptor_T=simple_adaptor, 
-                        adaptor_S=simple_adaptor,
-                        embeds_adaptor=simple_embeds_adaptor,
-                        logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
-                        global_step_start=0,
-                        use_softmax=True,
-                        dt_normalization_type='softmax',
-                    )
+        distiller = CustomDistiller2(
+            adaptor_T=simple_adaptor2,
+            adaptor_S=simple_adaptor2
+        )
+
+        # distiller = CustomDistiller(
+        #                 train_config=TrainingConfig(),
+        #                 distill_config=DistillationConfig(
+        #                     # hard_label_weight=0.5,
+        #                     # kd_loss_weight=0.5
+        #                 ),
+        #                 model_T=model_T, 
+        #                 model_S=model_S, 
+        #                 adaptor_T=simple_adaptor, 
+        #                 adaptor_S=simple_adaptor,
+        #                 embeds_adaptor=simple_embeds_adaptor,
+        #                 logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
+        #                 global_step_start=0,
+        #                 use_softmax=True,
+        #                 dt_normalization_type='softmax',
+        #             )
+        
     else:  # load small dummy language model
         return
 
     # build stage1 runner
-    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
+    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_multi_level_OT=True)
 
     # stage1 train, return 마지막 ckpt 경로 넘겨 받음
     ckpt_path = runner_1.train()
