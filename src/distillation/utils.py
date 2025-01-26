@@ -1,29 +1,15 @@
-import random
 from typing import Optional, Any, Union
-import itertools
 import numpy as np
-from transformers import PreTrainedTokenizerBase
-from transformers.utils import PaddingStrategy
-import sys
-
-# sys.path.append('./src/lm_evaluation_harness')
-# from lm_eval import tasks, evaluator
-# import lm_eval
-# import json
-# import logging
-# import fnmatch
-# import collections
-# import pdb
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.nn import Softmax, CrossEntropyLoss
-from safetensors.torch import save_file, load_file
+from safetensors.torch import load_file
 
-from textbrewer import GeneralDistiller
-from textbrewer.distiller_utils import *
-from textbrewer.distiller_basic import BasicDistiller
+# from textbrewer import GeneralDistiller
+# from textbrewer.distiller_utils import *
+# from textbrewer.distiller_basic import BasicDistiller
 
 def softmax_normalize(tensor, dim=-1):
     return F.softmax(tensor, dim=dim)
@@ -62,7 +48,7 @@ def dynamic_temperature(student_logits, teacher_logits, normalization_type=''):
     stu_std= torch.std(student_logits, dim=-1, keepdim=True)
     p_s = F.log_softmax(student_logits/tea_std, dim=1)
     p_t = F.softmax(teacher_logits/stu_std, dim=1)
-    # pdb.set_trace()
+
     loss = torch.sum(torch.sum(F.kl_div(p_s, p_t, reduction='none'), dim=-1) * (1 * torch.ones(student_logits.shape[0],1).cuda())) /student_logits.shape[0]/ student_logits.shape[0]
     return loss
 

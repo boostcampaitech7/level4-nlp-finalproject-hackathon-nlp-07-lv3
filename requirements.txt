@@ -36,3 +36,4 @@ pycountry
 omegaconf
 pytablewriter
 
+protobuf==3.20.*
