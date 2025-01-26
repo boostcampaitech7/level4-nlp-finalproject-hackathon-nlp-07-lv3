@@ -21,7 +21,7 @@ from dist_utils import get_rank, get_world_size, is_dist_avail_and_initialized, 
 from logger import MetricLogger, SmoothedValue
 from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
-from models.json_to_manifest import json_to_manifest_indice
+from models.json_to_manifest import json_to_manifest_indice, json_to_manifest
 from nemo.collections.asr.models import EncDecMultiTaskModel
 
 class Runner:
@@ -83,13 +83,17 @@ class Runner:
         else:
             self.model = self._model
 
-        train_dataset = datasets["train"]
-
         if "valid" in datasets.keys():
+            train_dataset = datasets["train"]
+            _ = json_to_manifest(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.train_manifest_path)
+
             valid_dataset = datasets["valid"]
+            _ = json_to_manifest(self.config.config.datasets.valid_ann_path_1, self.config.config.datasets.valid_manifest_path)
 
         else:
-            train_size = int(0.9 * len(train_dataset))
+            train_dataset = datasets["train"]
+
+            train_size = int(0.8 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
 
             train_indices, valid_indices = random_split(
@@ -104,9 +108,8 @@ class Runner:
             assert(self.config.config.datasets.train_manifest_path != '')
             assert(self.config.config.datasets.valid_manifest_path != '')
 
-            json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.train_manifest_path, train_indices)
-            json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.valid_manifest_path, valid_indices)
-
+            _ = json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.train_manifest_path, train_indices)
+            _ = json_to_manifest_indice(self.config.config.datasets.train_ann_path_1, self.config.config.datasets.valid_manifest_path, valid_indices)
 
         test_dataset = datasets["test"] if "test" in datasets else None
 
@@ -123,6 +126,9 @@ class Runner:
 
         self.train_config, self.n_loader_train = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.train_manifest_path, batch_size=self.config.config.run.batch_size_train)
         self.validation_config, self.n_loader_valid = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.valid_manifest_path, batch_size=self.config.config.run.batch_size_eval)
+
+        # self.n_loader_train.batch_size = 4
+        # self.n_loader_valid.batch_size = 4
 
         self.model.speech_encoder._update_dataset_config(dataset_name='train', config=self.train_config)
         self.model.speech_encoder._train_dl = self.n_loader_train
@@ -190,20 +196,13 @@ class Runner:
         logging.info("Start training epoch {}, {} iters per inner epoch.".format(epoch, self.iters_per_epoch))
         header = "Train: data epoch: [{}]".format(epoch)
 
-        for i in metric_logger.log_every(
-            range(self.iters_per_epoch),
-            self.config.config.run.log_freq,
-            header=header,
-            logger=self.log_writter,
-            start_step=epoch * self.iters_per_epoch,
-        ):
+        for i, n_samples in zip(metric_logger.log_every(range(self.iters_per_epoch), self.config.config.run.log_freq, header=header, logger=self.log_writter, start_step=epoch * self.iters_per_epoch,),
+                                      self.n_loader_train._get_iterator()):
             if i >= self.iters_per_epoch:
                 break
 
             samples = next(self.train_loader)
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
-
-            n_samples = next(self.n_loader_train._get_iterator())
 
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
@@ -263,9 +262,8 @@ class Runner:
         header = "Eval: data epoch: [{}]".format(epoch)
 
         results = []
-        for samples in metric_logger.log_every(dataloader, self.config.config.run.log_freq, header=header):
+        for samples, n_samples in zip(metric_logger.log_every(dataloader, self.config.config.run.log_freq, header=header), self.n_loader_valid._get_iterator()):
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
-            n_samples = next(self.n_loader_valid._get_iterator())
 
             if not self.dryrun:
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
@@ -399,6 +397,12 @@ class Runner:
 
             # validating phase
             logging.info("Validating Phase")
+
+            # Test how much iteration self.n_loader_train has
+            for elem in self.n_loader_valid._get_iterator():
+                temp = elem
+                print(temp.audio.shape)
+
             valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
             if valid_log is not None:
                 if is_main_process():

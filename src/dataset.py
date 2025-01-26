@@ -38,8 +38,8 @@ class SALMONNDataset(Dataset):
         return len(self.annotation)
 
     def collater(self, samples):
-        samples_spectrogram = [s["spectrogram"] for s in samples]
-        cat_spectrogram = torch.stack(samples_spectrogram, dim=0)
+        # samples_spectrogram = [s["spectrogram"] for s in samples]
+        # cat_spectrogram = torch.stack(samples_spectrogram, dim=0)
 
         raw_wav = [torch.from_numpy(s["raw_wav"]) for s in samples]
         raw_wav_length = torch.tensor([len(s["raw_wav"]) for s in samples])
@@ -52,7 +52,7 @@ class SALMONNDataset(Dataset):
         id = [s["id"] for s in samples]
 
         return {
-            "spectrogram": cat_spectrogram,
+            "spectrogram": None,
             "raw_wav": raw_wav,
             "padding_mask": paddding_mask,
             "text": text,
@@ -65,7 +65,7 @@ class SALMONNDataset(Dataset):
         ann = self.annotation[index]
         audio_path = self.prefix + '/' + ann["path"]
         audio, sr = sf.read(audio_path)
-        
+
         if len(audio.shape) == 2: # stereo to mono
             audio = audio[:, 0]
 
@@ -79,13 +79,13 @@ class SALMONNDataset(Dataset):
 
         audio = audio[: sr * 30]  # truncate audio to at most 30s
 
-        spectrogram = self.wav_processor(audio, sampling_rate=sr, return_tensors="pt")["input_features"].squeeze()
+        #spectrogram = self.wav_processor(audio, sampling_rate=sr, return_tensors="pt")["input_features"].squeeze()
         text = ann["text"]
         task = ann.get("task", "asr")
         Q = ann.get("Q", "")
 
         return {
-            "spectrogram": spectrogram,
+            "spectrogram": None,
             "raw_wav": audio,
             "text": text,
             "task": task,

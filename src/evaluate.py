@@ -139,7 +139,6 @@ def main(args):
 
     test_config, n_loader_test = get_dataloader_from_config(salmonn_preprocessor.speech_encoder, menifest_path, batch_size=cfg.config.run.batch_size_eval)
 
-
     transcribe_cfg = get_transcribe_config(menifest_path, batch_size=cfg.config.run.batch_size_eval)
     salmonn_preprocessor.speech_encoder._transcribe_on_begin(menifest_path, transcribe_cfg)
 
@@ -152,11 +151,9 @@ def main(args):
 
     # Evaluation
     testset_ids, hyps, refs = [], [], []
-    for samples in tqdm(dataloader):
+    for samples, n_samples in tqdm(zip(dataloader, n_loader_test)):
         testset_id = samples["testset_id"]
         testset_ids.extend(testset_id)
-
-        n_samples = next(n_loader_test._get_iterator())
 
         # Preprocess
         samples = prepare_sample(samples, cuda_enabled=torch.cuda.is_available())

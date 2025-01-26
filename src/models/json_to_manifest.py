@@ -11,9 +11,11 @@ default_manifest_options = {
 
 manifest_prefix = '/data/data_storage'
 
-def json_to_manifest(src_path, dst_path, options=default_manifest_options):
+def json_to_manifest(src_path, dst_path):
     # read each path in annotation section of src json file
     # write each path to dst jsonl file
+    open(dst_path, 'w').close()
+
     with open(src_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -25,11 +27,14 @@ def json_to_manifest(src_path, dst_path, options=default_manifest_options):
             slash = '' if audio_filepath[0] == '/' else '/'
             audio_filepath = manifest_prefix + slash + audio_filepath
 
-            task_name = d['task']
+            f.write(json.dumps({"audio_filepath": audio_filepath, "taskname": "asr", **default_manifest_options}) + '\n')
 
-            f.write(json.dumps({"audio_filepath": audio_filepath, "taskname": "asr", **options}) + '\n')
+    return dst_path
 
 def json_to_manifest_indice(src_path, dst_path, indices):
+    # erase all data in dst_path
+    open(dst_path, 'w').close()
+
     with open(src_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 

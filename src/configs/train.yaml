@@ -50,7 +50,7 @@ model:
 datasets:
   prefix: "/data/data_storage"
 
-  train_ann_path_1: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/six.json"
+  train_ann_path_1: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/filtered_stage1_train_sample.json"
   valid_ann_path_1: ""
   train_ann_path_2: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/filtered_stage2_train_sample.json"
   valid_ann_path_2: ""
@@ -72,8 +72,8 @@ run:
   log_freq: 5            # 원래 5
 
   # 에퐄 및 배치 관련 설정
-  epoch_based: False        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
-  iters_per_epoch: 50     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
+  epoch_based: True        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
+  iters_per_epoch: 5     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
   accum_grad_iters: 1
   batch_size_train: 4    # 원래 8
   batch_size_eval: 4     # 원래 8
