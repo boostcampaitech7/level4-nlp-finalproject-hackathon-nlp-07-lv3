@@ -6,14 +6,14 @@ from transformers import PreTrainedTokenizerBase
 from transformers.utils import PaddingStrategy
 import sys
 
-sys.path.append('./src/lm_evaluation_harness')
-from lm_eval import tasks, evaluator
-import lm_eval
-import json
-import logging
-import fnmatch
-import collections
-import pdb
+# sys.path.append('./src/lm_evaluation_harness')
+# from lm_eval import tasks, evaluator
+# import lm_eval
+# import json
+# import logging
+# import fnmatch
+# import collections
+# import pdb
 
 import torch
 import torch.nn as nn
@@ -77,9 +77,18 @@ def pad_logits(student_logits, teacher_logits, padding_value=-100):
         student_logits = F.pad(student_logits, (0, 0, 0, pad_size))
     return student_logits, teacher_logits
 
-def read_teacher_outputs(teacher_output_path: str):
+def read_teacher_outputs(teacher_output_path: str, device='cuda'):
     loaded_data = load_file(teacher_output_path)
-    return loaded_data
+    if "logits" not in loaded_data:
+        raise KeyError(f"'logits' key not found in {teacher_output_path}")
+    
+    results = {
+        "logits": loaded_data["logits"].to(device),
+    }
+    if "loss" in loaded_data:
+        results["loss"] = loaded_data["loss"].to(device)
+    
+    return results
 
 def custom_post_adaptor(dict_object):
     if 'logits' in dict_object:

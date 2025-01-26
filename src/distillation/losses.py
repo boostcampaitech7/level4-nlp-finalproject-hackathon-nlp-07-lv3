@@ -84,9 +84,18 @@ def cosine_similarity(q_vec, c_vec):
     c_vec = c_vec / c_vec.norm(dim=1, keepdim=True)
     return torch.mm(q_vec, c_vec.T)
 
-def contrastive_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature=1):
-    L_i1 = -1 * torch.log(torch.exp(cosine_similarity(encoder_embeds_T, encoder_embeds_T) / scaling_temerature) / torch.sum(torch.exp(cosine_similarity(encoder_embeds_T, encoder_embeds_S) / scaling_temerature), dim=0))
-    L_i2 = -1 * torch.log(torch.exp(cosine_similarity(encoder_embeds_T, encoder_embeds_T) / scaling_temerature) / torch.sum(torch.exp(cosine_similarity(encoder_embeds_S, encoder_embeds_T) / scaling_temerature), dim=0))
+def contrastive_loss(encoder_embeds_S, encoder_embeds_T, scaling_temperature=1):
+    sim_matrix = cosine_similarity(encoder_embeds_T, encoder_embeds_S)  
+    pos_sim = torch.diag(sim_matrix)  #
+    exp_sim_matrix = torch.exp(sim_matrix / scaling_temperature) 
+    row_sum = exp_sim_matrix.sum(dim=1)
+    L_i1 = -torch.log(torch.exp(pos_sim / scaling_temperature) / row_sum)
+
+    sim_matrix_transposed = sim_matrix.T 
+    pos_sim_transposed = torch.diag(sim_matrix_transposed)  
+    row_sum_transposed = exp_sim_matrix.T.sum(dim=1) 
+    L_i2 = -torch.log(torch.exp(pos_sim_transposed / scaling_temperature) / row_sum_transposed)
     L_contra = torch.mean(L_i1 + L_i2)
+
     return L_contra
 

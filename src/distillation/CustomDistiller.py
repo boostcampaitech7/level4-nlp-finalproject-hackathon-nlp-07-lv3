@@ -359,7 +359,7 @@ class CustomDistiller2:
         output_T, output_S, target_T, target_S = CustomDict(move_to_cuda(self.adaptor_T(output_T), device)), CustomDict(move_to_cuda(self.adaptor_S(output_S), device)), move_to_cuda(target_T, device), move_to_cuda(target_S, device)
         loss, crossentropy_loss, distillation_loss = self.multi_level_OT_distiller(epoch, output_S, output_T, target_S, target_T)
         if self.use_encoder_output:
-            encoder_output_S, encoder_output_T = encoder_output_S.to(device), encoder_output_T.to(device)
+            encoder_output_S, encoder_output_T = encoder_output_S.last_hidden_state.to(device), encoder_output_T.last_hidden_state.to(device)
             encoder_loss = self.encoder_kd_loss(encoder_output_S, encoder_output_T)
             loss += encoder_loss
 

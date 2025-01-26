@@ -294,7 +294,10 @@ class SALMONN(nn.Module):
             else:
                 raise NotImplementedError
 
-        return speech_embeds, speech_atts
+        if self.distillation:
+            return speech_embeds, speech_atts, query_output
+        else:
+            return speech_embeds, speech_atts
 
     def encode_speech(self, spectrogram, raw_wav=None, audio_padding_mask=None):
         with self.maybe_autocast():
@@ -397,11 +400,16 @@ class SALMONN(nn.Module):
         # speech encoder + non-speech encoder 의 결과물을 합쳐서 QFormer를 통과 후에 LLM에 들어가기 위해서 proj 까지 완료된 결과물
         # LLM에 input으로 들어가기 위한 값들
         # spectrogram 이 Whisper , raw_wav 가 BEATs
-        speech_embeds, speech_atts = self.encode_speech(
-            spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
-        )
         if self.distillation:
-            encoder_embeds = speech_embeds
+            speech_embeds, speech_atts, query_output = self.encode_speech(
+                spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
+            )
+            encoder_embeds = query_output
+        else:
+            speech_embeds, speech_atts = self.encode_speech(
+                spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
+            )
+
 
         # wrap speech_embeds with prompts
         # LLM instruction을 위한 prompt와 결합
@@ -471,7 +479,7 @@ class SALMONN(nn.Module):
                 labels=targets,
             )
             loss = outputs.loss
-        
+
         if self.distillation:
             return outputs, encoder_embeds, targets
 

@@ -144,7 +144,9 @@ def main():
         )
 
         # distiller = CustomDistiller(
-        #                 train_config=TrainingConfig(),
+        #                 train_config=TrainingConfig(
+        #                     device=run_config.device
+        #                 ),
         #                 distill_config=DistillationConfig(
         #                     # hard_label_weight=0.5,
         #                     # kd_loss_weight=0.5
@@ -153,7 +155,6 @@ def main():
         #                 model_S=model_S, 
         #                 adaptor_T=simple_adaptor, 
         #                 adaptor_S=simple_adaptor,
-        #                 embeds_adaptor=simple_embeds_adaptor,
         #                 logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
         #                 global_step_start=0,
         #                 use_softmax=True,
@@ -201,7 +202,7 @@ def main():
         )
 
     # build stage2 runner
-    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
+    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_multi_level_OT=True)
 
     # stage2 train
     runner_2.train()
