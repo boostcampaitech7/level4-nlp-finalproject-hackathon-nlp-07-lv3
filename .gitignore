@@ -36,3 +36,9 @@ Thumbs.db
 # 개인 설정값 무시
 *.yaml
 *.yml
+
+src/lm_evaluation_harness/*
+src/LLMPruner/*
+
+src/Multi_Level_OT_main
+src/Multi-Level-OT-main
