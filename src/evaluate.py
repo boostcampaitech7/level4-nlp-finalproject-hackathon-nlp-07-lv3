@@ -15,6 +15,7 @@ from salmonn_utils import SALMONNTestDataset, load_model, load_preprocessor
 from models.modeling_canary import get_transcribe_config
 from utils import get_dataloader, prepare_sample
 from models.json_to_manifest import json_to_manifest
+from models.modeling_canary import get_dataloader_from_config
 
 
 def parse_args():
@@ -99,28 +100,6 @@ def replace_test_ann_path(cfg):
             cfg.config.datasets.test_ann_path = cfg.config.datasets.test_ann_path_aac
     return cfg
 
-
-def get_dataloader_from_config(model, manifet_path : str, batch_size, test_config = None):
-    if test_config:
-        config = config
-
-    else:
-        config = OmegaConf.create(
-        dict(
-            manifest_filepath=manifet_path,
-            sample_rate=16000,
-            channel_selector=0,
-            labels=None,
-            batch_size=batch_size,
-            shuffle=False,
-            time_length=30,
-            use_lhotse = True,
-        )
-    )
-
-    return config, model._setup_dataloader_from_config(config=config)
-
-
 def main(args):
     cfg = Config(args)
     cfg = replace_test_ann_path(cfg)
@@ -161,9 +140,9 @@ def main(args):
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
 
-        n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda:1')
-        raw_wav = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda:1')
-        audio_padding_mask = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda:1')
+        n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda')
+        raw_wav = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda')
+        audio_padding_mask = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda')
 
         speech_embeds, speech_atts = salmonn_preprocessor.encode_speech(
             n_samples, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask

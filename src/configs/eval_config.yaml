@@ -64,4 +64,4 @@ datasets:
 run:
   batch_size_eval: 8
   num_workers: 4
-  device: "cuda:1"
+  device: "cuda"

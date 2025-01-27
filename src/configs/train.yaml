@@ -10,7 +10,8 @@ model:
   # paths
   llama_path: "meta-llama/Llama-3.2-3B-Instruct"
   whisper_path: "openai/whisper-large-v2"
-  beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로
+  #beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로
+  beats_path: ""      # 다운받은 BEATs 모델 경로
 
   canary_path : "nvidia/canary-1b"
 
@@ -72,8 +73,8 @@ run:
   log_freq: 5            # 원래 5
 
   # 에퐄 및 배치 관련 설정
-  epoch_based: True        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
-  iters_per_epoch: 5     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
+  epoch_based: False        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
+  iters_per_epoch: 6000     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
   accum_grad_iters: 1
   batch_size_train: 4    # 원래 8
   batch_size_eval: 4     # 원래 8

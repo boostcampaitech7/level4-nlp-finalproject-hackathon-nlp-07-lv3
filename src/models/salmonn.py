@@ -132,6 +132,7 @@ class SALMONN(nn.Module):
         self.low_resource = low_resource
 
         self.profile_flag = False
+        self.dimension_adjuster = None
 
         logging.info("Loading LLaMA Tokenizer")
         self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path, use_fast=False, token=token)
@@ -182,7 +183,7 @@ class SALMONN(nn.Module):
         assert canary_path
         logging.info("Loading Canary Model")
 
-        self.speech_encoder = EncDecMultiTaskModel.from_pretrained(canary_path, map_location=torch.device("cuda:1" if torch.cuda.is_available() else "cpu"))
+        self.speech_encoder = EncDecMultiTaskModel.from_pretrained(canary_path, map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         self.conformer = self.speech_encoder.encoder
         self.d_model = self.conformer.d_model
         # n_layernorm = conformer.d_model
@@ -316,6 +317,17 @@ class SALMONN(nn.Module):
         with self.maybe_autocast():
             if self.use_speech_Qformer:
                 speech_embeds = self.ln_speech(speech_embeds)
+
+                canary_output_dim = speech_embeds.size(-1)
+                qformer_input_dim = self.speech_Qformer.config.hidden_size
+
+                if canary_output_dim != qformer_input_dim:
+                    # 차원 조정을 위한 선형 투영층 추가
+                    self.dimension_adjuster = nn.Linear(canary_output_dim, qformer_input_dim).to(speech_embeds.device)
+                    speech_embeds = self.dimension_adjuster(speech_embeds)
+
+                    speech_embeds = self.ln_speech(speech_embeds)
+
                 if audio_embeds is not None:
                     audio_embeds = self.ln_audio(audio_embeds)
 
@@ -385,17 +397,58 @@ class SALMONN(nn.Module):
                 whisper_profiler.__enter__()
                 logging.info("Start Canary Encoding")
 
-                spectrogram, spectrogram_len, = n_samples.audio, n_samples.audio_lens
-                _, _, speech_embeds, _ = self.speech_encoder.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
+                input_signal, input_signal_length, = n_samples.audio, n_samples.audio_lens
+
+                processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
+                    input_signal=input_signal, length=input_signal_length
+                )
+
+                encoded, encoded_len = self.speech_encoder.encoder(audio_signal=processed_signal, length=processed_signal_length)
+
+                if hasattr(self, 'embed_positions'):
+                    embed_pos = self.embed_positions.weight
+                    speech_embeds = encoded + embed_pos
+                else:
+                    speech_embeds = encoded
+
+                speech_embeds = torch.permute(speech_embeds, [0, 2, 1])
+                speech_embeds = nn.functional.dropout(speech_embeds, p=0.0, training=True)
+                speech_embeds = self.ln_speech(speech_embeds)
+
+                # processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
+                #     input_signal=spectrogram,
+                #     length=spectrogram_len
+                # )
+
+                # encoder_output = self.speech_encoder(
+                #     audio_signal=processed_signal, length=processed_signal_length
+                # )
+
                 whisper_profiler.__exit__(None, None, None)
 
             else:
                 #speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
 
                 spectrogram, spectrogram_len, = n_samples.audio, n_samples.audio_lens
-                #spectrogram = spectrogram.to('cuda:1')
+                #spectrogram = spectrogram.to('cuda')
 
-                _, _, speech_embeds, _ = self.speech_encoder.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
+                input_signal, input_signal_length, = n_samples.audio, n_samples.audio_lens
+
+                processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
+                    input_signal=input_signal, length=input_signal_length
+                )
+
+                encoded, encoded_len = self.speech_encoder.encoder(audio_signal=processed_signal, length=processed_signal_length)
+
+                if hasattr(self, 'embed_positions'):
+                    embed_pos = self.embed_positions.weight
+                    speech_embeds = encoded + embed_pos
+                else:
+                    speech_embeds = encoded
+
+                speech_embeds = torch.permute(speech_embeds, [0, 2, 1])
+                speech_embeds = nn.functional.dropout(speech_embeds, p=0.0, training=True)
+                speech_embeds = self.ln_speech(speech_embeds)
 
             if self.beats_path and n_samples.audio is not None:
                 if self.profile_flag:
@@ -480,7 +533,7 @@ class SALMONN(nn.Module):
 
     def forward(self, samples, n_samples, verbose=False, profile_flag=False):
         self.profile_flag = profile_flag
-        device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
@@ -530,6 +583,7 @@ class SALMONN(nn.Module):
             max_length=self.max_txt_len,
             add_special_tokens=False,
         ).to(device)
+
         to_regress_embeds = (
             self.llama_model.model.embed_tokens(to_regress_tokens.input_ids)
             if not self.lora
@@ -728,7 +782,7 @@ class SALMONN(nn.Module):
         ckpt_path = config.get("ckpt", "")
         if ckpt_path:
             logging.info("Load SALMONN ckpt from: {}".format(ckpt_path))
-            ckpt = torch.load(ckpt_path, map_location="cuda:1", weights_only=True)
+            ckpt = torch.load(ckpt_path, map_location="cuda", weights_only=True)
             model.load_state_dict(ckpt["model"], strict=False)
 
         return model

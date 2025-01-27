@@ -16,10 +16,98 @@ except ImportError:
     def autocast(enabled=None):
         yield
 
+import torch
+import torch.nn as nn
+import random
+
+
+class ExtendedCanaryEncoder(nn.Module):
+    def __init__(self, encoder, transformer_layers, embed_positions, dropout, layer_norm):
+        super().__init__()
+        self.encoder = encoder  # The original NVIDIA Canary Encoder
+        self.transformer_layers = transformer_layers  # List of Transformer layers
+        self.embed_positions = embed_positions  # Positional embeddings
+        self.dropout = dropout  # Dropout probability
+        self.layer_norm = layer_norm  # Final LayerNorm
+        self.training = True  # To simulate training mode, set externally in practice
+
+    def forward(
+        self,
+        input_signal=None,
+        input_signal_length=None,
+        processed_signal=None,
+        processed_signal_length=None,
+        transcript=None,
+        transcript_length=None,
+        output_hidden_states=False,
+        output_attentions=False,
+    ):
+        """
+        Forward pass with extended hidden state vector computation.
+        """
+        # Step 1: Call the original NVIDIA Canary Encoder
+        transf_log_probs, encoded_len, enc_states, enc_mask = self.encoder(
+            input_signal=input_signal,
+            input_signal_length=input_signal_length,
+            processed_signal=processed_signal,
+            processed_signal_length=processed_signal_length,
+            transcript=transcript,
+            transcript_length=transcript_length,
+        )
+
+        # Step 2: Add positional embeddings to encoded states
+        hidden_states = enc_states + self.embed_positions.weight
+
+        # Step 3: Apply dropout to hidden states
+        hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+
+        # Step 4: Initialize containers for optional outputs
+        encoder_states = () if output_hidden_states else None
+        all_attentions = () if output_attentions else None
+
+        # Step 5: Process through Transformer layers
+        for idx, transformer_layer in enumerate(self.transformer_layers):
+            if output_hidden_states:
+                encoder_states = encoder_states + (hidden_states,)
+
+            # Optional: Skip layers during training based on LayerDrop
+            dropout_probability = random.uniform(0, 1)
+            if self.training and (dropout_probability < 0.1):  # Adjust layerdrop probability as needed
+                continue
+
+            # Compute forward pass through the transformer layer
+            layer_outputs = transformer_layer(
+                hidden_states,
+                attention_mask=enc_mask,
+                output_attentions=output_attentions,
+            )
+            hidden_states = layer_outputs[0]
+
+            if output_attentions:
+                all_attentions = all_attentions + (layer_outputs[1],)
+
+        # Step 6: Apply final layer normalization
+        hidden_states = self.layer_norm(hidden_states)
+
+        # Append final hidden states to `encoder_states` if requested
+        if output_hidden_states:
+            encoder_states = encoder_states + (hidden_states,)
+
+        # Step 7: Return results
+        return {
+            "transf_log_probs": transf_log_probs,
+            "encoded_len": encoded_len,
+            "last_hidden_state": hidden_states,
+            "hidden_states": encoder_states,
+            "attentions": all_attentions,
+            "encoder_mask": enc_mask,
+        }
+
+
 @dataclass
 class InternalTranscribeConfig:
     # Internal values
-    device: Optional[torch.device] = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device: Optional[torch.device] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dtype: Optional[torch.dtype] = None
     training_mode: bool = False
     logging_level: Optional[Any] = None
@@ -68,7 +156,7 @@ def move_data_to_device(inputs: Any, device: Union[str, torch.device], non_block
     else:
         return inputs
 
-def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str, test_config : OmegaConf = None, transcribe_cfg: TranscribeConfig = None, batch_size: int = 2):
+def get_dataloader_from_config(model : EncDecMultiTaskModel, manifet_path : str, batch_size, test_config : OmegaConf = None):
     if test_config:
         config = config
 
@@ -102,7 +190,7 @@ def get_transcribe_config(manifest_filepath, batch_size, transcribe_cfg: Transcr
             verbose=True,
             timestamps=None,
             _internal=InternalTranscribeConfig(
-                device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu"),
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                 dtype = None,
                 training_mode = False,
                 logging_level = None,
@@ -119,28 +207,28 @@ def get_transcribe_config(manifest_filepath, batch_size, transcribe_cfg: Transcr
 
     return transcribe_cfg
 
-def train_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda:1'):
+def train_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda'):
     config, _ = get_dataloader_from_config(speaker_model, manifest_file)
 
     speaker_model.setup_training_data(config)
 
     return speaker_model
 
-def test_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda:1'):
+def test_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda'):
     config, _ = get_dataloader_from_config(speaker_model, manifest_file)
 
     speaker_model.setup_test_data(config)
 
     return speaker_model
 
-def valid_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda:1'):
+def valid_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda'):
     config, _ = get_dataloader_from_config(speaker_model, manifest_file)
 
     speaker_model.setup_validation_data(config)
 
     return speaker_model
 
-def execute_model(speaker_model : EncDecMultiTaskModel, transcribe_cfg, device='cuda:1'):
+def execute_model(speaker_model : EncDecMultiTaskModel, transcribe_cfg, device='cuda'):
 
     for test_batch in tqdm(speaker_model.val_dataloader(), desc="Transcribing", disable=not transcribe_cfg.verbose):
         # Move batch to device

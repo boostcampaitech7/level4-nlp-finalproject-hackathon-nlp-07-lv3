@@ -174,9 +174,9 @@ def main(args):
 
     n_samples = next(n_loader_test._get_iterator())
 
-    n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda:1')
-    sample_batch["raw_wav"] = salmonn_preprocessor.move_data_to_device(sample_batch["raw_wav"], 'cuda:1')
-    sample_batch["padding_mask"] = salmonn_preprocessor.move_data_to_device(sample_batch["padding_mask"], 'cuda:1')
+    n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda')
+    sample_batch["raw_wav"] = salmonn_preprocessor.move_data_to_device(sample_batch["raw_wav"], 'cuda')
+    sample_batch["padding_mask"] = salmonn_preprocessor.move_data_to_device(sample_batch["padding_mask"], 'cuda')
 
     # Measure memory and latency
     memory_usages = []
@@ -195,7 +195,7 @@ def main(args):
                 salmonn_preprocessor,
             )
         torch.cuda.synchronize()
-        after_memory_allocated = torch.cuda.max_memory_allocated(device='cuda:1')
+        after_memory_allocated = torch.cuda.max_memory_allocated(device='cuda')
 
         torch.cuda.empty_cache()  # Clear the cache to get more accurate measurements
         gc.collect()

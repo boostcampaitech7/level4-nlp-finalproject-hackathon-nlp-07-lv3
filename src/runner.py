@@ -23,6 +23,7 @@ from optims import LinearWarmupCosineLRScheduler, get_optimizer
 from utils import get_dataloader, prepare_sample
 from models.json_to_manifest import json_to_manifest_indice, json_to_manifest
 from nemo.collections.asr.models import EncDecMultiTaskModel
+from models.modeling_canary import get_dataloader_from_config
 
 class Runner:
     def __init__(self, cfg, model, datasets, job_id, dryrun, SEED):
@@ -39,7 +40,7 @@ class Runner:
 
         # settings
         #self.device = torch.device(self.config.config.run.device)
-        self.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.use_distributed = self.config.config.run.use_distributed
         self.start_epoch = 0
         self.max_epoch = self.config.config.run.optims.max_epoch
@@ -93,7 +94,7 @@ class Runner:
         else:
             train_dataset = datasets["train"]
 
-            train_size = int(0.8 * len(train_dataset))
+            train_size = int(0.95 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
 
             train_indices, valid_indices = random_split(
@@ -124,8 +125,8 @@ class Runner:
             test_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         ) if test_dataset else None
 
-        self.train_config, self.n_loader_train = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.train_manifest_path, batch_size=self.config.config.run.batch_size_train)
-        self.validation_config, self.n_loader_valid = self.get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.valid_manifest_path, batch_size=self.config.config.run.batch_size_eval)
+        self.train_config, self.n_loader_train = get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.train_manifest_path, batch_size=self.config.config.run.batch_size_train)
+        self.validation_config, self.n_loader_valid = get_dataloader_from_config(self.model.speech_encoder, self.config.config.datasets.valid_manifest_path, batch_size=self.config.config.run.batch_size_eval)
 
         # self.n_loader_train.batch_size = 4
         # self.n_loader_valid.batch_size = 4
@@ -159,26 +160,6 @@ class Runner:
         )
 
         self.log_config()
-
-    def get_dataloader_from_config(self, model : EncDecMultiTaskModel, manifet_path : str, batch_size, test_config : OmegaConf = None):
-        if test_config:
-            config = config
-
-        else:
-            config = OmegaConf.create(
-            dict(
-                manifest_filepath=manifet_path,
-                sample_rate=16000,
-                labels=None,
-                batch_size=batch_size,
-                shuffle=False,
-                time_length=30,
-                use_lhotse = True,
-            )
-        )
-
-        return config, model._setup_dataloader_from_config(config=config)
-
 
     def unwrap_dist_model(self, model):
         if self.use_distributed:

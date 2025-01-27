@@ -154,7 +154,7 @@ class MetricLogger(object):
                             meters=str(self),
                             time=str(iter_time),
                             data=str(data_time),
-                            memory=torch.cuda.max_memory_allocated(device='cuda:1') / MB,
+                            memory=torch.cuda.max_memory_allocated(device='cuda') / MB,
                         )
                     )
                 else:
