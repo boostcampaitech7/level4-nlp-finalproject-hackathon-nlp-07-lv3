@@ -113,16 +113,16 @@ def main():
 
     # build stage1 datasets
     # 별도로 valid 지정 없는 경우 train만 생성 후 split
-    # if data_config.valid_ann_path_1:
-    #     datasets = {
-    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
-    #         "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path),
-    #     }
+    if data_config.valid_ann_path_1:
+        datasets = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
+            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path),
+        }
 
-    # else:
-    #     datasets = {
-    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
-    #     }
+    else:
+        datasets = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
+        }
 
 
     def simple_adaptor(model_outputs, batch=None):
@@ -164,15 +164,15 @@ def main():
     else:  # load small dummy language model
         return
 
-    # # build stage1 runner
-    # runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_multi_level_OT=True)
+    # build stage1 runner
+    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_multi_level_OT=True)
 
-    # # stage1 train, return 마지막 ckpt 경로 넘겨 받음
-    # ckpt_path = runner_1.train()
-    # torch.cuda.empty_cache()
+    # stage1 train, return 마지막 ckpt 경로 넘겨 받음
+    ckpt_path = runner_1.train()
+    torch.cuda.empty_cache()
 
-    # # stage1 wandb 종료
-    # wandb.finish()
+    # stage1 wandb 종료
+    wandb.finish()
 
     # build stage2 datasets
     # 별도로 valid 지정 없는 경우 train만 생성 후 split
