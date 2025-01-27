@@ -12,7 +12,6 @@ checkpoints/
 outputs_stage*/
 wandb/
 logs/
-submission_results/
 *.pt
 *.pth
 *.ckpt
