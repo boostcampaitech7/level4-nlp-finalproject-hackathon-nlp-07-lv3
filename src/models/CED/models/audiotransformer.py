@@ -394,8 +394,8 @@ class AudioTransformer(nn.Module):
 
     def forward(self, x):
         if self.training:
-            x = self.wavtransforms(x.unsqueeze(1)).squeeze(1)
-        x = self.front_end(x)
+            x = self.wavtransforms(x.unsqueeze(1)).squeeze(1) # torch_audiomentations as wavtransforms
+        x = self.front_end(x) # audio_transforms.MelSpectrogram + audio_transforms.AmplitudeToDB
         if self.training:
             x = self.spectransforms(x)
         x = self.forward_spectrogram(x)

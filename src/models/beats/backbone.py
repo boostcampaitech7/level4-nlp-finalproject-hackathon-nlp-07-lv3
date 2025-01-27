@@ -56,6 +56,7 @@ class TransformerEncoder(nn.Module):
             self.num_buckets = 0
             self.max_distance = 0
 
+        # 결론적으로 최종 출력은 embedding_dim
         self.layers = nn.ModuleList(
             [
                 TransformerSentenceEncoderLayer(
@@ -112,6 +113,8 @@ class TransformerEncoder(nn.Module):
         if padding_mask is not None:
             x[padding_mask] = 0
 
+        # 입력과 출력이 self.embedding_dim(encoder_embed_dim)과 같음
+        # transpose를 하는 이유는 cnn은 (batch_size, channels/embedding_dim, sequence_length)이니 (batch_size, sequence_length, embedding_dim)를 맞추기 위해서
         x_conv = self.pos_conv(x.transpose(1, 2))
         x_conv = x_conv.transpose(1, 2)
         x = x + x_conv
@@ -148,6 +151,7 @@ class TransformerEncoder(nn.Module):
         # T x B x C -> B x T x C
         x = x.transpose(0, 1)
 
+        # x_dim = x.shape[-1] = self.embedding_dim
         return x, layer_results
 
 
