@@ -159,6 +159,8 @@ def main():
     cfg.config.run.optims = optims_2
     cfg.config.run.output_dir = output_dir_2
     cfg.config.model.ckpt = ckpt_path
+    cfg.config.run.batch_size_train = 4
+    cfg.config.run.batch_size_eval = 4
 
     # print config
     cfg.pretty_print()

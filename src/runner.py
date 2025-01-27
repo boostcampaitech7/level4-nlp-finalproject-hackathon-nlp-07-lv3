@@ -159,7 +159,7 @@ class Runner:
                 break
 
             samples = next(self.train_loader)
-            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
+            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled, device=self.config.config.run.device)
 
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
