@@ -370,3 +370,164 @@ class CustomDistiller2:
         wandb.log(losses_dict)
         print(losses_dict)
         return loss
+
+class MultiGranularFeatureAlignment(nn.Module):
+    """
+    - low-level: CNN 필터 출력의 평균 풀링 결과 비교
+    - mid-level: self-attention 맵 비교
+    - high-level: 최종 임베딩 혹은 로짓 KL 비교
+    """
+    def __init__(self, audio_dim=1024, text_dim=4096):
+        super().__init__()
+        # 계층 매핑 시 필요한 투영 레이어
+        self.low_proj = nn.Linear(audio_dim, text_dim)
+        self.mid_proj = nn.Linear(audio_dim, text_dim)
+        self.high_proj = nn.Linear(audio_dim, text_dim)
+
+    def forward(self, audio_feats, text_feats):
+        """
+        audio_feats: [B, T, A_dim]
+        text_feats:  [B, T, T_dim]
+        """
+
+        # (1) 저수준 특성 정렬 (예: CNN 출력의 평균 풀링)
+        audio_low = F.avg_pool1d(audio_feats.transpose(1,2), kernel_size=3).transpose(1,2)
+        text_low  = F.avg_pool1d(text_feats.transpose(1,2), kernel_size=3).transpose(1,2)
+        loss_low = F.mse_loss(self.low_proj(audio_low), text_low)
+
+        # (2) 중간 단계: self-attention 맵 유사도
+        #   예: audio_feats, text_feats 각각 Attention 연산 수행 후 결과 비교
+        audio_attn = torch.softmax(audio_feats @ audio_feats.transpose(1,2), dim=-1)
+        text_attn  = torch.softmax(text_feats @ text_feats.transpose(1,2), dim=-1)
+        loss_mid   = F.kl_div(audio_attn.log(), text_attn, reduction='batchmean')
+
+        # (3) 고수준: 로짓 정렬(KL divergence)
+        audio_high = self.high_proj(audio_feats)  # [B, T, text_dim]
+        loss_high  = F.kl_div(
+            F.log_softmax(audio_high, dim=-1),
+            F.softmax(text_feats, dim=-1),
+            reduction='batchmean'
+        )
+
+        # 가중 합산(임의로 0.3:0.4:0.3으로 설정)
+        return 0.3 * loss_low + 0.4 * loss_mid + 0.3 * loss_high
+    
+class DifficultyAwareDistiller:
+    """
+    - 교사 모델 로짓에서 계산된 엔트로피 혹은 손실을 바탕으로
+      샘플별로 distillation loss 가중치를 자동 조정.
+    """
+    def __init__(self, base_alpha=0.2, max_alpha=0.4, ema=0.9):
+        self.base_alpha = base_alpha
+        self.max_alpha = max_alpha
+        self.ema = ema
+        self.prev_entropy = None
+
+    def calc_distillation_loss(self, teacher_logits, student_logits, gold_labels=None):
+        """
+        teacher_logits: [B, T, C]
+        student_logits: [B, T, C]
+        """
+        # (1) 교사 모델의 엔트로피 계산
+        teacher_probs = torch.softmax(teacher_logits, dim=-1)
+        teacher_ent   = -torch.sum(teacher_probs * torch.log(teacher_probs + 1e-9), dim=-1)
+        batch_ent     = teacher_ent.mean()
+
+        # (2) EMA(지수 가중 이동평균)로 난이도 추적
+        if self.prev_entropy is None:
+            self.prev_entropy = batch_ent
+        else:
+            self.prev_entropy = self.ema * self.prev_entropy + (1 - self.ema) * batch_ent
+
+        # (3) 난이도에 따른 alpha 조정
+        #     예: 난이도가 높을수록 alpha가 커진다
+        dynamic_alpha = self.base_alpha + torch.sigmoid(self.prev_entropy - 2.0) * (self.max_alpha - self.base_alpha)
+        
+        # (4) distillation loss: KL(teacher || student)
+        distill_loss = F.kl_div(
+            F.log_softmax(student_logits, dim=-1),
+            torch.softmax(teacher_logits, dim=-1),
+            reduction='batchmean'
+        )
+        
+        # (5) CE 손실(ground truth와 student 예측 비교)
+        ce_loss = None
+        if gold_labels is not None:
+            ce_loss = F.cross_entropy(student_logits.transpose(1,2), gold_labels)
+        else:
+            # gold_labels가 없는 경우, distil loss만
+            ce_loss = 0
+
+        # (6) 최종 손실 결합
+        total_loss = (1 - dynamic_alpha) * ce_loss + dynamic_alpha * distill_loss
+        return total_loss, distill_loss, ce_loss, dynamic_alpha.item()
+    
+class StreamingAdapter:
+    """
+    주어진 chunk_size와 lookahead로 오디오 스트리밍을 처리
+    AAC 실시간 태스크에 활용 가능
+    """
+    def __init__(self, model, teacher_model=None, chunk_size=16000, lookahead=4000):
+        self.model = model
+        self.teacher_model = teacher_model  # 없을 경우 None
+        self.buffer = torch.zeros(chunk_size + lookahead)
+        self.chunk_size = chunk_size
+        self.lookahead = lookahead
+
+    def stream_step(self, new_audio):
+        """
+        new_audio: [N] mono waveform
+        """
+        # 버퍼 업데이트
+        self.buffer = torch.cat([self.buffer[self.chunk_size:], new_audio])
+        chunk = self.buffer[:self.chunk_size]
+        look = self.buffer[-self.lookahead:]
+
+        # 모델 추론(학생)
+        student_out = self.model.forward_chunk(chunk, look)
+
+        distill_loss = 0
+        if self.teacher_model is not None:
+            with torch.no_grad():
+                teacher_out = self.teacher_model.forward_chunk(chunk, look)
+            distill_loss = F.kl_div(
+                F.log_softmax(student_out, dim=-1),
+                torch.softmax(teacher_out, dim=-1),
+                reduction='batchmean'
+            )
+        return student_out, distill_loss
+    
+class StreamingAdapter:
+    """
+    주어진 chunk_size와 lookahead로 오디오 스트리밍을 처리
+    AAC 실시간 태스크에 활용 가능
+    """
+    def __init__(self, model, teacher_model=None, chunk_size=16000, lookahead=4000):
+        self.model = model
+        self.teacher_model = teacher_model  # 없을 경우 None
+        self.buffer = torch.zeros(chunk_size + lookahead)
+        self.chunk_size = chunk_size
+        self.lookahead = lookahead
+
+    def stream_step(self, new_audio):
+        """
+        new_audio: [N] mono waveform
+        """
+        # 버퍼 업데이트
+        self.buffer = torch.cat([self.buffer[self.chunk_size:], new_audio])
+        chunk = self.buffer[:self.chunk_size]
+        look = self.buffer[-self.lookahead:]
+
+        # 모델 추론(학생)
+        student_out = self.model.forward_chunk(chunk, look)
+
+        distill_loss = 0
+        if self.teacher_model is not None:
+            with torch.no_grad():
+                teacher_out = self.teacher_model.forward_chunk(chunk, look)
+            distill_loss = F.kl_div(
+                F.log_softmax(student_out, dim=-1),
+                torch.softmax(teacher_out, dim=-1),
+                reduction='batchmean'
+            )
+        return student_out, distill_loss
