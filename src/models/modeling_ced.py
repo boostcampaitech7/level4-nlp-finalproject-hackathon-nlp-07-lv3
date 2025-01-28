@@ -1,9 +1,39 @@
+import torch
+from typing import Any, Callable, Optional, Tuple, Union
+from einops import rearrange
+from einops.layers.torch import Rearrange
+
 from src.models.CED.models.audiotransformer import Attention, Block
 from .CED.models.audiotransformer import *
 
-class CEDWrapper(AudioTransformer):
+class ExtendedCEDEncoder(AudioTransformer):
 
-    def __init__(self, outputdim=527, patch_size=16, patch_stride=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True, drop_rate=0, attn_drop_rate=0, drop_path_rate=0, init_bn: bool = True, norm_layer=None, act_layer=None, init_values=None, target_length=1012, pooling='mean', wavtransforms=None, spectransforms=None, time_patch_out: float | None = None, freq_patch_out: float | None = None, block_type=..., attention_type=..., eval_avg='mean', **kwargs):
+    def __init__(self,
+                 outputdim=527,
+                 patch_size=16,
+                 patch_stride=16,
+                 embed_dim=768,
+                 depth=12,
+                 num_heads=12,
+                 mlp_ratio=4.,
+                 qkv_bias=True,
+                 drop_rate=0.,
+                 attn_drop_rate=0.,
+                 drop_path_rate=0.,
+                 init_bn: bool = True,
+                 norm_layer=None,
+                 act_layer=None,
+                 init_values=None,
+                 target_length=1012,
+                 pooling='mean',
+                 wavtransforms=None,
+                 spectransforms=None,
+                 time_patch_out: Optional[float] = None,
+                 freq_patch_out: Optional[float] = None,
+                 block_type=Block,
+                 attention_type=Attention,
+                 eval_avg='mean',
+                 **kwargs):
         super().__init__(outputdim, patch_size, patch_stride, embed_dim, depth, num_heads, mlp_ratio, qkv_bias, drop_rate, attn_drop_rate, drop_path_rate, init_bn, norm_layer, act_layer, init_values, target_length, pooling, wavtransforms, spectransforms, time_patch_out, freq_patch_out, block_type, attention_type, eval_avg, **kwargs)
 
     def forward_spectrogram(self, x: torch.Tensor) -> torch.Tensor:

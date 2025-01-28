@@ -20,7 +20,7 @@ class FrontEnd(nn.Sequential):
                  sample_rate: int = 16000,
                  win_size: int = 512,
                  center: bool = True,
-                 n_fft: int = 512,
+                 n_fft: int = 512, # frame_length beats에선 25ms 즉, 400
                  f_max: Optional[int] = None,
                  hop_size: int = 160,
                  n_mels: int = 64):
@@ -156,10 +156,10 @@ class Block(nn.Module):
 class AudioTransformer(nn.Module):
 
     def __init__(self,
-                 outputdim=527,
+                 outputdim=527, # n-class, forward_head 에서 활용 (linear head)
                  patch_size=16,
                  patch_stride=16,
-                 embed_dim=768,
+                 embed_dim=768,  # BEATs는 기본으로 768로 설정, 최종 output_dims
                  depth=12,
                  num_heads=12,
                  mlp_ratio=4.,
@@ -295,8 +295,8 @@ class AudioTransformer(nn.Module):
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)
             cls_token = cls_token + self.token_pos_embed
             x = torch.cat((cls_token, x), dim=1)
-        x = self.pos_drop(x)
-        x = self.blocks(x)
+        x = self.pos_drop(x) # drop-out
+        x = self.blocks(x) # input_dims = output_dims (x 차원 변화 없음)
         x = self.norm(x)
         return x
 
@@ -398,7 +398,7 @@ class AudioTransformer(nn.Module):
         x = self.front_end(x) # audio_transforms.MelSpectrogram + audio_transforms.AmplitudeToDB
         if self.training:
             x = self.spectransforms(x)
-        x = self.forward_spectrogram(x)
+        x = self.forward_spectrogram(x) # output_dims = self.embed_dim
         return x
 
 
