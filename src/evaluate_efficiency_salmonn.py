@@ -2,9 +2,9 @@ import argparse
 import gc
 import json
 import os
+import random
 import subprocess
 import time
-import random
 
 import numpy as np
 import torch
@@ -32,8 +32,7 @@ def set_seed(seed: int):
     torch.backends.cudnn.deterministic = True  # cuDNN에서 결정론적 연산 강제
     torch.backends.cudnn.benchmark = False  # 성능 최적화 비활성화 (결정론적 결과 보장)
     torch.set_num_threads(1)  # 멀티스레딩 환경에서의 일관성 확보를 위해 CPU 스레드를 1로 제한
-    mp.set_start_method('spawn', force=True)  # 멀티프로세싱 시작 방식 설정
-
+    mp.set_start_method("spawn", force=True)  # 멀티프로세싱 시작 방식 설정
 
 
 def load_model(salmonn_preprocessor):
@@ -74,8 +73,9 @@ class MockDataset(SALMONNDataset):
         }
 
     @staticmethod
-    def make_mock_dataloader(cfg, sr, audio_length, dataset_length=100):
+    def make_mock_dataloader(cfg, sr, audio_length, dataset_length=100, num_workers=0):
         dataset = MockDataset(cfg, sr, audio_length, dataset_length)
+        cfg.config.run.num_workers = num_workers  # config 객체에 num_workers 설정
         return get_dataloader(dataset, cfg.config.run, is_train=False, use_distributed=False)
 
 
@@ -165,7 +165,6 @@ def model_inference(cfg, samples, test_prompt, salmonn):
 
 
 def main(args):
-
     seed = 42
     set_seed(seed)  # 시드 설정
 
@@ -179,10 +178,13 @@ def main(args):
     llama_model, _ = load_model(salmonn_preprocessor)
     salmonn_preprocessor.llama_model = llama_model
 
-    # Load dataset
-    with open("./prompts/test_prompt.json", "r") as f:
+    # 설정 파일에서 경로를 읽어옴
+    test_prompt_path = cfg.config.model.test_prompt_path
+    with open(test_prompt_path, "r", encoding="utf-8") as f:
         test_prompt = json.load(f)
-    dataloader = MockDataset.make_mock_dataloader(cfg, sr=16000, audio_length=10)
+
+    # 디버깅용 num_workers = 0
+    dataloader = MockDataset.make_mock_dataloader(cfg, sr=16000, audio_length=10, num_workers=0)
     sample_batch = next(iter(dataloader))
     sample_batch = prepare_sample(sample_batch, cuda_enabled=torch.cuda.is_available())
 
