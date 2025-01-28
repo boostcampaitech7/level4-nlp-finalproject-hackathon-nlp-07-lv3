@@ -1,3 +1,4 @@
-from models.audiotransformer import *
-from models.checkpoints import list_models
-from models.ensemble import EnsembleModel
+from .audiotransformer import *
+from .checkpoints import list_models, register_model, build_mdl
+from .ensemble import EnsembleModel
+from .audiotransformer import AudioTransformer, Block, Attention

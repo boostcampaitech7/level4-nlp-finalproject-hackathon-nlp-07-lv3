@@ -2,9 +2,11 @@ import torch
 from typing import Any, Callable, Optional, Tuple, Union
 from einops import rearrange
 from einops.layers.torch import Rearrange
+import sys
 
-from src.models.CED.models.audiotransformer import Attention, Block
-from .CED.models.audiotransformer import *
+sys.path.append('/data/pgt/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/models/CED/models')
+# from .CED.models.audiotransformer import Attention, Block
+from .CED.models import *
 
 class ExtendedCEDEncoder(AudioTransformer):
 
@@ -39,6 +41,7 @@ class ExtendedCEDEncoder(AudioTransformer):
     def forward_spectrogram(self, x: torch.Tensor) -> torch.Tensor:
         x = rearrange(x, 'b f t -> b 1 f t')
         x = self.init_bn(x)
+        print("2. {}".format(x.shape))
         if x.shape[-1] > self.maximal_allowed_length:
             splits = x.split(self.target_length, -1)
 
@@ -55,25 +58,219 @@ class ExtendedCEDEncoder(AudioTransformer):
                 splits = torch.stack(splits[:-1], dim=0)
             n_splits = len(splits)
             x = rearrange(splits, 'spl b c f t-> (spl b) c f t')
-            x = self.forward_head(self.forward_features(x))
-            x = rearrange(x, '(spl b) d -> spl b d', spl=n_splits)
-            if self.eval_avg == 'mean':
-                x = x.mean(0)
-            elif self.eval_avg == 'max':
-                x = x.max(0)[0]
-            else:
-                raise ValueError(
-                    f'Unknown Eval average function ({self.eval_avg})')
-
+            x = self.forward_features(x)
         else:
             x = self.forward_features(x)
         return x
 
     def forward(self, x):
-        if self.training:
-            x = self.wavtransforms(x.unsqueeze(1)).squeeze(1)
+        print("1. {}".format(x.shape))
+        x = x.float()
+        # if self.training:
+        #     x = self.wavtransforms(x.unsqueeze(1)).squeeze(1)
         x = self.front_end(x)
-        if self.training:
-            x = self.spectransforms(x)
+        # if self.training:
+        #     x = self.spectransforms(x)
         x = self.forward_spectrogram(x)
         return x
+    
+
+
+@register_model
+def audiotransformer_tiny(num_classes: int = 527,
+                          pretrained=False,
+                          pretrained_url: str = 'https://zenodo.org/records/8275347/files/audiotransformer_tiny_mae_as_10s.pt?download=1',
+                          **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=192,
+                        depth=12,
+                        num_heads=3,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def ced_tiny(
+        num_classes: int = 527,
+        pretrained=True,
+        pretrained_url:
+    str = 'https://zenodo.org/record/8275319/files/audiotransformer_tiny_mAP_4814.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=192,
+                        depth=12,
+                        num_heads=3,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def audiotransformer_mini(
+        num_classes: int = 527,
+        pretrained=True,
+        pretrained_url:
+    str = 'https://zenodo.org/record/8275347/files/audiotransformer_mini_mae_as_10s.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=256,
+                        depth=12,
+                        num_heads=4,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def ced_mini(
+        num_classes: int = 527,
+        pretrained=True,
+        pretrained_url:
+    str = 'https://zenodo.org/record/8275319/files/audiotransformer_mini_mAP_4896.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=256,
+                        depth=12,
+                        num_heads=4,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def audiotransformer_small(
+        num_classes: int = 527,
+        pretrained=True,
+        pretrained_url:
+    str = 'https://zenodo.org/record/8275347/files/audiotransformer_small_mae_as_10s.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=384,
+                        depth=12,
+                        num_heads=6,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def ced_small(
+        num_classes: int = 527,
+        pretrained=True,
+        pretrained_url:
+    str = 'https://zenodo.org/record/8275319/files/audiotransformer_small_mAP_4958.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=384,
+                        depth=12,
+                        num_heads=6,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def audiotransformer_base(
+        num_classes: int = 527,
+        pretrained=True,
+        pretrained_url:
+    str = 'https://zenodo.org/record/8275347/files/audiotransformer_base_mae_as_10s.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=768,
+                        depth=12,
+                        num_heads=12,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def ced_base(
+        num_classes: int = 527,
+        pretrained=False,
+        pretrained_url:
+    str = 'https://zenodo.org/record/8275319/files/audiotransformer_base_mAP_4999.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=768,
+                        depth=12,
+                        num_heads=12,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+@register_model
+def audiotransformer_base_4740(
+        num_classes: int = 527,
+        pretrained=True,
+        pretrained_url:
+    str = 'https://zenodo.org/record/7964975/files/audiotransformer_base_mAP_47_40.pt?download=1',
+        **kwargs):
+    model_kwargs = dict(patch_size=16,
+                        embed_dim=768,
+                        depth=12,
+                        num_heads=12,
+                        mlp_ratio=4,
+                        outputdim=num_classes)
+    model_kwargs = dict(model_kwargs, **kwargs)
+    return build_mdl(
+        ExtendedCEDEncoder,
+        pretrained=pretrained,
+        pretrained_url=pretrained_url,
+        **model_kwargs,
+    )
+
+
+if __name__ == "__main__":
+    ced_mini()

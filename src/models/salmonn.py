@@ -27,6 +27,8 @@ from .beats.BEATs import BEATs, BEATsConfig
 from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub
+from .modeling_ced import *
+from . import modeling_ced
 
 
 class SALMONN(nn.Module):
@@ -154,24 +156,33 @@ class SALMONN(nn.Module):
 
         if self.beats_path:
             logging.info("Loading BEATs Model")
-            beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
-            beats_cfg = BEATsConfig(beats_ckpt["cfg"])
-            # non-speech model
-            self.beats = BEATs(beats_cfg)
-            self.beats.load_state_dict(beats_ckpt["model"])
-            # non-speech
-            self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
+            self.beats = getattr(modeling_ced, self.beats_path)(pretrained=True)
+            self.ln_audio = nn.LayerNorm(self.beats.embed_dim)
             if freeze_beats:
                 for name, param in self.beats.named_parameters():
                     param.requires_grad = False
                 self.beats.eval()
                 logging.info("freeze BEATs")
 
+            # beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
+            # beats_cfg = BEATsConfig(beats_ckpt["cfg"])
+            # # non-speech model
+            # self.beats = BEATs(beats_cfg)
+            # self.beats.load_state_dict(beats_ckpt["model"])
+            # # non-speech
+            # self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
+            # if freeze_beats:
+            #     for name, param in self.beats.named_parameters():
+            #         param.requires_grad = False
+            #     self.beats.eval()
+            #     logging.info("freeze BEATs")
+
         if self.use_speech_Qformer:
             if self.beats_path:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
                     num_query_token=num_speech_query_token,
-                    speech_width=self.speech_encoder.config.d_model + self.beats.cfg.encoder_embed_dim,
+                    speech_width=self.speech_encoder.config.d_model + self.beats.embed_dim
+                    # speech_width=self.speech_encoder.config.d_model + self.beats.cfg.encoder_embed_dim,
                 )
             else:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
@@ -253,6 +264,21 @@ class SALMONN(nn.Module):
                     elif audio_embeds.size(1) > speech_embeds.size(1):
                         speech_embeds = F.pad(speech_embeds, (0, 0, 0, audio_embeds.size(1) - speech_embeds.size(1)))
                     # speech encoder + non-speech encoder 결과를 concat 해서 Z 값
+                    if audio_embeds.shape[0] > speech_embeds.shape[0]:
+                        split_size = int(audio_embeds.shape[0] / speech_embeds.shape[0])
+                        print(split_size)
+                        catted_audio_embeds = None
+                        for i in range(int(audio_embeds.shape[0] / split_size)):
+                            start = split_size * i
+                            end = split_size * (i + 1)
+                            sliced = audio_embeds[start:end, :, :] 
+                            if catted_audio_embeds is None:
+                                catted_audio_embeds = torch.cat([sliced[k:k+1, :, :] for k in range(split_size)], dim=-1)
+                            else:
+                                catted_audio_embeds = torch.cat([catted_audio_embeds, torch.cat([sliced[k:k+1, :, :] for k in range(split_size)], dim=-1)], dim=0)
+                        audio_embeds = catted_audio_embeds
+                    print(speech_embeds.shape)
+                    print(audio_embeds.shape)
                     speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
                 speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
 
@@ -300,9 +326,10 @@ class SALMONN(nn.Module):
             speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
             # non-speech
             if self.beats_path and raw_wav is not None:
-                audio_embeds, _ = self.beats.extract_features(
-                    raw_wav, padding_mask=audio_padding_mask, feature_only=True
-                )
+                audio_embeds = self.beats.forward(raw_wav)
+                # audio_embeds, _ = self.beats.extract_features(
+                #     raw_wav, padding_mask=audio_padding_mask, feature_only=True
+                # )
             else:
                 audio_embeds = None
 
