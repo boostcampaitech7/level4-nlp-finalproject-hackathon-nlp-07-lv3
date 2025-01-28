@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import os
 import random
 import time
@@ -108,7 +109,9 @@ def main(args):
     # Load data
     dataloader = get_dataset(cfg.config.datasets, cfg.config.run, args.task)
 
-    with open("./prompts/test_prompt.json", "r") as f:
+    # 설정 파일에서 경로를 읽어옴
+    test_prompt_path = cfg.config.model.test_prompt_path
+    with open(test_prompt_path, "r", encoding="utf-8") as f:
         test_prompt = json.load(f)
 
     # Evaluation
@@ -168,6 +171,9 @@ def main(args):
 
         results = tokenizer.batch_decode(outputs)
         hyp = [result.split(generate_cfg.end_sym)[0].lower() for result in results]
+
+        # 잘 생성되고 있는지 디버깅
+        logging.info(f"생성된 text: {hyp}")
         hyps.extend(hyp)
 
         if not args.make_submission:
