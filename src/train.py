@@ -159,8 +159,19 @@ def main():
     cfg.config.run.optims = optims_2
     cfg.config.run.output_dir = output_dir_2
     cfg.config.model.ckpt = ckpt_path
-    cfg.config.run.batch_size_train = 4
-    cfg.config.run.batch_size_eval = 4
+
+    del model
+    torch.cuda.empty_cache() 
+
+    if not args.dryrun:
+        model = load_model(model_config)
+    else:  # load small dummy language model
+        from transformers import AutoModelForCausalLM
+
+        model = AutoModelForCausalLM.from_pretrained("apple/OpenELM-270M-Instruct", trust_remote_code=True)
+
+    # cfg.config.run.batch_size_train = 4
+    # cfg.config.run.batch_size_eval = 4
 
     # print config
     cfg.pretty_print()
