@@ -276,7 +276,15 @@ class SALMONN(nn.Module):
                     355     return F.linear(input, self.weight, self.bias)
                     356 RuntimeError: mat1 and mat2 shapes cannot be multiplied (11968x3584 and 2048x768)
 
-                    이런 식으로 밑에서 split 된 
+                    이런 식으로 밑에서 split 된 CED 결과물을 강제로 합치면은 QFormer 에서 init 시에 설정한 768 을 넘어가게 됨 (3개로 나누어졌다고 하면 결국 768 * 3으로 이루어져 2304가 됨) 
+                    즉, 43 torch.Size([8, 1500, 1280]) 244 torch.Size([8, 1500, 2304]) 전자는 whisper 후자는 CED 결과인데 원래는 밑에와 같이 init 시에 
+
+                    self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
+                        num_query_token=num_speech_query_token,
+                        speech_width=self.speech_encoder.config.d_model + self.beats.embed_dim
+                    )
+
+                    whisper + CED 길이를 fixed 해서 1280 + 768 = 2048로 설정해놨는데 나눠진걸 배치 수 맞추겠다고 강제로 concat 하면은 이 값이 동적으로 변하기에 당장 3개를 합쳐서 768이어야 할게 2304가 되서 2304 + 1280 = 3584가 되서 2048과 맞지 않아 문제 발생 
                     '''
                     
 
