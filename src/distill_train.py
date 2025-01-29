@@ -174,7 +174,7 @@ def main():
         return
 
     # build stage1 runner
-    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_custom_3=False)
+    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
 
     # stage1 train, return 마지막 ckpt 경로 넘겨 받음
     ckpt_path = runner_1.train()
@@ -216,7 +216,7 @@ def main():
         )
 
     # build stage2 runner
-    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_custom_3=False)
+    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
 
     # stage2 train
     runner_2.train()

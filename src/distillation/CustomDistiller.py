@@ -123,7 +123,7 @@ class CustomDistiller(GeneralDistiller):
             student_batch = batch_S
         else:
             results_S = self.model_S(batch_S)
-            results_T = CustomDict(read_teacher_outputs(T_outputs_path. self.t_config.device))
+            results_T = CustomDict(read_teacher_outputs(T_outputs_path, self.t_config.device))
             teacher_batch = batch_S
             student_batch = batch_S
 
@@ -166,17 +166,18 @@ class CustomDistiller(GeneralDistiller):
             teacher_probs = torch.softmax(logits_list_T[0], dim=-1)
             teacher_ent   = -torch.sum(teacher_probs * torch.log(teacher_probs + 1e-9), dim=-1)
             batch_ent     = teacher_ent.mean()
+            batch_ent_detached = batch_ent.detach()
 
             # (2) EMA(지수 가중 이동평균)로 난이도 추적
             if self.prev_entropy is None:
-                self.prev_entropy = batch_ent
+                self.prev_entropy = batch_ent_detached
             else:
-                self.prev_entropy = self.ema * self.prev_entropy + (1 - self.ema) * batch_ent
+                self.prev_entropy = self.ema * self.prev_entropy + (1 - self.ema) * batch_ent_detached
 
             # (3) 난이도에 따른 alpha 조정
             #     예: 난이도가 높을수록 alpha가 커진다
             dynamic_alpha = self.base_alpha + torch.sigmoid(self.prev_entropy - 2.0) * (self.max_alpha - self.base_alpha)
-            dynamic_alpha = dynamic_alpha.item()
+            dynamic_alpha = dynamic_alpha.to(self.t_config.device).item()
 
             '''
             textbrewer/distiller_utils/select_logits_with_mask
