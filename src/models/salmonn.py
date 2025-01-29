@@ -264,19 +264,35 @@ class SALMONN(nn.Module):
                     elif audio_embeds.size(1) > speech_embeds.size(1):
                         speech_embeds = F.pad(speech_embeds, (0, 0, 0, audio_embeds.size(1) - speech_embeds.size(1)))
                     # speech encoder + non-speech encoder 결과를 concat 해서 Z 값
-                    if audio_embeds.shape[0] > speech_embeds.shape[0]:
-                        split_size = int(audio_embeds.shape[0] / speech_embeds.shape[0])
-                        print(split_size)
-                        catted_audio_embeds = None
-                        for i in range(int(audio_embeds.shape[0] / split_size)):
-                            start = split_size * i
-                            end = split_size * (i + 1)
-                            sliced = audio_embeds[start:end, :, :] 
-                            if catted_audio_embeds is None:
-                                catted_audio_embeds = torch.cat([sliced[k:k+1, :, :] for k in range(split_size)], dim=-1)
-                            else:
-                                catted_audio_embeds = torch.cat([catted_audio_embeds, torch.cat([sliced[k:k+1, :, :] for k in range(split_size)], dim=-1)], dim=0)
-                        audio_embeds = catted_audio_embeds
+
+                    '''
+                    File "/data/pgt/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/models/Qformer.py", line 154, in forward
+                    349     key_layer = self.transpose_for_scores(self.key(encoder_hidden_states))
+                    350   File "/data/miniconda3/envs/pgt/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+                    351     return self._call_impl(*args, **kwargs)
+                    352   File "/data/miniconda3/envs/pgt/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+                    353     return forward_call(*args, **kwargs)
+                    354   File "/data/miniconda3/envs/pgt/lib/python3.9/site-packages/torch/nn/modules/linear.py", line 125, in forward
+                    355     return F.linear(input, self.weight, self.bias)
+                    356 RuntimeError: mat1 and mat2 shapes cannot be multiplied (11968x3584 and 2048x768)
+
+                    이런 식으로 밑에서 split 된 
+                    '''
+                    
+
+                    # if audio_embeds.shape[0] > speech_embeds.shape[0]:
+                    #     split_size = int(audio_embeds.shape[0] / speech_embeds.shape[0])
+                    #     print(split_size)
+                    #     catted_audio_embeds = None
+                    #     for i in range(int(audio_embeds.shape[0] / split_size)):
+                    #         start = split_size * i
+                    #         end = split_size * (i + 1)
+                    #         sliced = audio_embeds[start:end, :, :] 
+                    #         if catted_audio_embeds is None:
+                    #             catted_audio_embeds = torch.cat([sliced[k:k+1, :, :] for k in range(split_size)], dim=-1)
+                    #         else:
+                    #             catted_audio_embeds = torch.cat([catted_audio_embeds, torch.cat([sliced[k:k+1, :, :] for k in range(split_size)], dim=-1)], dim=0)
+                    #     audio_embeds = catted_audio_embeds
                     print(speech_embeds.shape)
                     print(audio_embeds.shape)
                     speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
