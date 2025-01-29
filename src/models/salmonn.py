@@ -477,6 +477,7 @@ class SALMONN(nn.Module):
                 attention_mask=attention_mask,
                 return_dict=True,
                 labels=targets,
+                output_hidden_states=True
             )
             loss = outputs.loss
 

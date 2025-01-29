@@ -35,13 +35,14 @@ class CustomDistiller(GeneralDistiller):
                  logits_pro,
                  global_step_start,
                  use_softmax,
-                 use_encoder_embeds=False,
+                 use_encoder_embeds=True,
                  dt_normalization_type : Optional[str] = "softmax",
-                 intermediate_normalization_type : Optional[str] = "softmasx",
+                 intermediate_normalization_type : Optional[str] = "softmax",
                  kd_type : Optional[str] = "kl_divergence_token_level",
                  intermediate_control_config='',
                  layer_weight=0.1,
-                 padding_value=0
+                 padding_value=0,
+                 base_alpha=0.2, max_alpha=0.4, ema=0.9
     ):
 
         super(CustomDistiller, self).__init__(train_config, distill_config, model_T, model_S, adaptor_T, adaptor_S)
@@ -64,6 +65,10 @@ class CustomDistiller(GeneralDistiller):
             self.encoder_kd_loss = encoder_kd_loss
         else:
             self.encoder_kd_loss = None
+        self.base_alpha = base_alpha
+        self.max_alpha = max_alpha
+        self.ema = ema
+        self.prev_entropy = None
         
 
         self.projs = []
@@ -157,6 +162,22 @@ class CustomDistiller(GeneralDistiller):
 
             total_kd_loss = 0
 
+            # (1) 교사 모델의 엔트로피 계산
+            teacher_probs = torch.softmax(logits_list_T[0], dim=-1)
+            teacher_ent   = -torch.sum(teacher_probs * torch.log(teacher_probs + 1e-9), dim=-1)
+            batch_ent     = teacher_ent.mean()
+
+            # (2) EMA(지수 가중 이동평균)로 난이도 추적
+            if self.prev_entropy is None:
+                self.prev_entropy = batch_ent
+            else:
+                self.prev_entropy = self.ema * self.prev_entropy + (1 - self.ema) * batch_ent
+
+            # (3) 난이도에 따른 alpha 조정
+            #     예: 난이도가 높을수록 alpha가 커진다
+            dynamic_alpha = self.base_alpha + torch.sigmoid(self.prev_entropy - 2.0) * (self.max_alpha - self.base_alpha)
+            dynamic_alpha = dynamic_alpha.item()
+
             '''
             textbrewer/distiller_utils/select_logits_with_mask
             select_logits_with_mask 에서 attention_mask 을 활용해서 Logits 값 중에서 유효한 값들만 남김
@@ -238,7 +259,7 @@ class CustomDistiller(GeneralDistiller):
         if self.encoder_kd_loss is not None:
             total_enkd_loss = 0
 
-            encoder_embeds_S, encoder_embeds_T = encoder_embeds_S.to(self.t_config.device), encoder_embeds_T.to(self.t_config.device)
+            encoder_embeds_S, encoder_embeds_T = encoder_embeds_S.last_hidden_state.to(self.t_config.device), encoder_embeds_T.last_hidden_state.to(self.t_config.device)
             total_enkd_loss = self.encoder_kd_loss(encoder_embeds_S, encoder_embeds_T)
             losses_dict['encoder_embeds_based_kd_loss'] = total_enkd_loss
 
@@ -251,7 +272,7 @@ class CustomDistiller(GeneralDistiller):
             losses_dict['cross_entropy_output_loss'] = total_hl_loss
 
         # Feature-Based
-        
+
         # inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
         # inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
         # inputs_mask_T = results_T.get('inputs_mask', None)
@@ -302,7 +323,8 @@ class CustomDistiller(GeneralDistiller):
         #     total_loss += intermediate_loss * match_weight
         #     losses_dict[f'unweighted_{feature}_{loss_type}_{name_S}_{name_T}'] = intermediate_loss
 
-        total_loss =  0.95 * losses_dict['cross_entropy_output_loss'] + 0.05 * losses_dict['logit_based_kd_loss']
+        # total_loss =  0.95 * losses_dict['cross_entropy_output_loss'] + 0.05 * losses_dict['logit_based_kd_loss']
+        total_loss = (1 - dynamic_alpha) * losses_dict['cross_entropy_output_loss'] + dynamic_alpha * losses_dict['logit_based_kd_loss'] + losses_dict['encoder_embeds_based_kd_loss']
         formated_losses_dict={}
         for key, value in losses_dict.items():
             if isinstance(value, torch.Tensor):
@@ -373,15 +395,17 @@ class CustomDistiller2:
     
 class CustomDistiller3:
 
-    def __init__(self, adaptor_T, adaptor_S, encoder_dim, decoder_dim, base_alpha=0.2, max_alpha=0.4, ema=0.9, mgfa_weight=1, encoder_loss_weight=0.5, use_encoder_output=True):
+    def __init__(self, adaptor_T, adaptor_S, encoder_dim, decoder_dim, base_alpha=0.2, max_alpha=0.4, ema=0.9, mgfa_weight=1, encoder_loss_weight=0.5, use_encoder_output=True, device='cuda'):
         self.use_encoder_output = use_encoder_output
         self.adaptor_T = adaptor_T
         self.adaptor_S = adaptor_S
+        self.device = device
 
-        self.mgfa = MultiGranularFeatureAlignment(
-                audio_dim=encoder_dim,
-                text_dim=decoder_dim
-            )
+        # self.mgfa = MultiGranularFeatureAlignment(
+        #         audio_dim=encoder_dim,
+        #         text_dim=decoder_dim,
+        #         device=self.device
+        #     )
         self.ddat =  DifficultyAwareDistiller(
                 base_alpha=base_alpha,
                 max_alpha=max_alpha,
@@ -404,23 +428,24 @@ class CustomDistiller3:
     def train_on_batch(self, epoch, output_T, output_S, encoder_output_T=None, encoder_output_S=None, device="cuda"):
         losses_dict={}
         output_T, output_S = CustomDict(move_to_cuda(self.adaptor_T(output_T), device)), CustomDict(move_to_cuda(self.adaptor_S(output_S), device))
-        loss_mgfa = self.mgfa(
-            audio_feats=encoder_output_S,  
-            text_feats=output_S
-        )
+        encoder_output_S, encoder_output_T = encoder_output_S.last_hidden_state.to(device), encoder_output_T.last_hidden_state.to(device)
+        # loss_mgfa = self.mgfa(
+        #     audio_feats=encoder_output_S,  
+        #     text_feats=output_S.last_hidden_state
+        # )
         total_loss, distill_loss, ce_loss, alpha_val = self.ddat.calc_distillation_loss(
-            teacher_logits=output_T,
-            student_logits=output_S,
+            teacher_output=output_T,
+            student_output=output_S,
         )
 
-        total_loss_all = total_loss + self.mgfa_weight * loss_mgfa
+        # total_loss_all = total_loss + self.mgfa_weight * loss_mgfa
+        total_loss_all = total_loss
         if self.use_encoder_output:
-            encoder_output_S, encoder_output_T = encoder_output_S.last_hidden_state.to(device), encoder_output_T.last_hidden_state.to(device)
             encoder_loss = self.encoder_kd_loss(encoder_output_S, encoder_output_T)
             total_loss_all += self.encoder_loss_weight * encoder_loss
  
         losses_dict['crossentropy'] = ce_loss
-        losses_dict['mgfa'] = loss_mgfa
+        # losses_dict['mgfa'] = loss_mgfa
         losses_dict['ddat'] = distill_loss
         losses_dict['dynamic_alpha'] = alpha_val
         if self.use_encoder_output:

@@ -100,46 +100,63 @@ def contrastive_loss(encoder_embeds_S, encoder_embeds_T, scaling_temperature=1):
     return L_contra
 
 class MultiGranularFeatureAlignment(nn.Module):
-    """
-    - low-level: CNN 필터 출력의 평균 풀링 결과 비교
-    - mid-level: self-attention 맵 비교
-    - high-level: 최종 임베딩 혹은 로짓 KL 비교
-    """
-    def __init__(self, audio_dim=1024, text_dim=4096):
+    def __init__(self, audio_dim=1024, text_dim=4096, device='cuda'):
         super().__init__()
-        # 계층 매핑 시 필요한 투영 레이어
-        self.low_proj = nn.Linear(audio_dim, text_dim)
-        self.mid_proj = nn.Linear(audio_dim, text_dim)
-        self.high_proj = nn.Linear(audio_dim, text_dim)
+        self.low_proj = nn.Linear(audio_dim, text_dim).to(device)
+        self.mid_proj = nn.Linear(audio_dim, text_dim).to(device)
+        self.high_proj = nn.Linear(audio_dim, text_dim).to(device)
+
+    def safe_avg_pool(self, x, kernel_size):
+        seq_len = x.size(-1)
+        if seq_len < kernel_size:
+            pad_total = kernel_size - seq_len
+            pad_left = pad_total // 2
+            pad_right = pad_total - pad_left
+            x = F.pad(x, (pad_left, pad_right), "constant", 0)
+        return F.avg_pool1d(x, kernel_size=kernel_size)
 
     def forward(self, audio_feats, text_feats):
-        """
-        audio_feats: [B, T, A_dim]
-        text_feats:  [B, T, T_dim]
-        """
+        # 배치 크기 강제 일치
+        assert audio_feats.size(0) == text_feats.size(0), \
+            f"Batch size mismatch: audio {audio_feats.size(0)} vs text {text_feats.size(0)}"
 
-        # (1) 저수준 특성 정렬 (예: CNN 출력의 평균 풀링)
-        audio_low = F.avg_pool1d(audio_feats.transpose(1,2), kernel_size=3).transpose(1,2)
-        text_low  = F.avg_pool1d(text_feats.transpose(1,2), kernel_size=3).transpose(1,2)
-        loss_low = F.mse_loss(self.low_proj(audio_low), text_low)
+        # (1) 저수준 특성 정렬
+        B = audio_feats.size(0)  # 배치 크기 고정
+        
+        # 오디오 처리
+        audio_t = audio_feats.transpose(1, 2)  # [B, A_dim, T_audio]
+        kernel_audio = min(3, audio_t.size(-1))
+        audio_low = self.safe_avg_pool(audio_t, kernel_audio)
+        audio_low = audio_low.transpose(1, 2)  # [B, T_audio_pool, A_dim]
+        
+        # 텍스트 처리
+        text_t = text_feats.transpose(1, 2)  # [B, T_text, D_text]
+        kernel_text = min(3, text_t.size(-1))
+        text_low = self.safe_avg_pool(text_t, kernel_text)
+        text_low = text_low.transpose(1, 2)  # [B, T_text_pool, D_text]
 
-        # (2) 중간 단계: self-attention 맵 유사도
-        #   예: audio_feats, text_feats 각각 Attention 연산 수행 후 결과 비교
+        # 시퀀스 길이 동기화
+        min_seq = min(audio_low.size(1), text_low.size(1))
+        loss_low = F.mse_loss(
+            self.low_proj(audio_low[:, :min_seq, :]), 
+            text_low[:, :min_seq, :]
+        )
+
+        # (2) 중간 단계: Attention 맵 유사도
         audio_attn = torch.softmax(audio_feats @ audio_feats.transpose(1,2), dim=-1)
-        text_attn  = torch.softmax(text_feats @ text_feats.transpose(1,2), dim=-1)
-        loss_mid   = F.kl_div(audio_attn.log(), text_attn, reduction='batchmean')
+        text_attn = torch.softmax(text_feats @ text_feats.transpose(1,2), dim=-1)
+        loss_mid = F.kl_div(audio_attn.log(), text_attn, reduction='batchmean')
 
-        # (3) 고수준: 로짓 정렬(KL divergence)
-        audio_high = self.high_proj(audio_feats)  # [B, T, text_dim]
-        loss_high  = F.kl_div(
+        # (3) 고수준: 로짓 정렬
+        audio_high = self.high_proj(audio_feats)
+        loss_high = F.kl_div(
             F.log_softmax(audio_high, dim=-1),
             F.softmax(text_feats, dim=-1),
             reduction='batchmean'
         )
 
-        # 가중 합산(임의로 0.3:0.4:0.3으로 설정)
         return 0.3 * loss_low + 0.4 * loss_mid + 0.3 * loss_high
-    
+
 class DifficultyAwareDistiller:
     """
     - 교사 모델 로짓에서 계산된 엔트로피 혹은 손실을 바탕으로

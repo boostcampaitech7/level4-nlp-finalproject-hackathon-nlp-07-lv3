@@ -129,7 +129,7 @@ def main():
         return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
 
     def simple_adaptor2(model_outputs, batch=None):
-        return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'loss': model_outputs.loss}
+        return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'loss': model_outputs.loss, 'last_hidden_state': model_outputs.hidden_states[-1]}
 
     # build model
     if not args.dryrun:
@@ -138,12 +138,13 @@ def main():
         else:
             model_T = load_model(model_T_config)
         model_S = load_model(model_S_config)
-        distiller = CustomDistiller3(
-            adaptor_T=simple_adaptor2,
-            adaptor_S=simple_adaptor2,
-            encoder_dim=model_S.speech_Qformer.config.hidden_size,
-            decoder_dim=model_S.llama_model.config.hidden_size
-        )
+        # distiller = CustomDistiller3(
+        #     adaptor_T=simple_adaptor2,
+        #     adaptor_S=simple_adaptor2,
+        #     encoder_dim=model_S.speech_Qformer.config.hidden_size,
+        #     decoder_dim=model_S.llama_model.config.hidden_size,
+        #     device=run_config.device
+        # )
 
 
         # distiller = CustomDistiller2(
@@ -151,29 +152,29 @@ def main():
         #     adaptor_S=simple_adaptor2
         # )
 
-        # distiller = CustomDistiller(
-        #                 train_config=TrainingConfig(
-        #                     device=run_config.device
-        #                 ),
-        #                 distill_config=DistillationConfig(
-        #                     # hard_label_weight=0.5,
-        #                     # kd_loss_weight=0.5
-        #                 ),
-        #                 model_T=model_T,
-        #                 model_S=model_S,
-        #                 adaptor_T=simple_adaptor,
-        #                 adaptor_S=simple_adaptor,
-        #                 logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
-        #                 global_step_start=0,
-        #                 use_softmax=True,
-        #                 dt_normalization_type='softmax',
-        #             )
+        distiller = CustomDistiller(
+                        train_config=TrainingConfig(
+                            device=run_config.device
+                        ),
+                        distill_config=DistillationConfig(
+                            # hard_label_weight=0.5,
+                            # kd_loss_weight=0.5
+                        ),
+                        model_T=model_T,
+                        model_S=model_S,
+                        adaptor_T=simple_adaptor,
+                        adaptor_S=simple_adaptor,
+                        logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
+                        global_step_start=0,
+                        use_softmax=True,
+                        dt_normalization_type='softmax',
+                    )
 
     else:  # load small dummy language model
         return
 
     # build stage1 runner
-    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_multi_level_OT=True)
+    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_custom_3=False)
 
     # stage1 train, return 마지막 ckpt 경로 넘겨 받음
     ckpt_path = runner_1.train()
@@ -215,7 +216,7 @@ def main():
         )
 
     # build stage2 runner
-    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_multi_level_OT=True)
+    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED, is_custom_3=False)
 
     # stage2 train
     runner_2.train()

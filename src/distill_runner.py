@@ -24,7 +24,7 @@ from utils import get_dataloader, prepare_sample
 
 
 class DistillRunner:
-    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED, teacher_output_dir:str="", is_multi_level_OT=False):
+    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED, teacher_output_dir:str="", is_custom_2=False, is_custom_3=False):
         self.seed = SEED
         self.config = cfg
         self.model_config = cfg.config.model_T
@@ -33,8 +33,9 @@ class DistillRunner:
         # dryrun (test with dummy model)
         self.dryrun = dryrun
 
-        # loss
-        self.is_multi_level_OT = is_multi_level_OT
+        # distiiler
+        self.is_custom_2 = is_custom_2
+        self.is_custom_3 = is_custom_3
 
         # log
         self.output_dir = Path(self.config.config.run.output_dir) / job_id
@@ -198,10 +199,14 @@ class DistillRunner:
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     if self.model_T is not None:
-                        if self.is_multi_level_OT:
+                        if self.is_custom_2:
                             output_T, encoder_output_T, targets_T = self.model_T(samples_T)
                             output_S, encoder_output_S, targets_S = self.model_S(samples_S)
                             loss = self.distiller.train_on_batch(epoch, output_T, output_S, targets_T, targets_S, encoder_output_T, encoder_output_S, device=self.device)
+                        elif self.is_custom_3:
+                            output_T, encoder_output_T, _ = self.model_T(samples_T)
+                            output_S, encoder_output_S, _ = self.model_S(samples_S)
+                            loss = self.distiller.train_on_batch(epoch, output_T, output_S, encoder_output_T, encoder_output_S, device=self.device)
                         else:
                             loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
                     else:
