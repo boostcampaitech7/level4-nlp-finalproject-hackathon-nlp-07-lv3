@@ -4,12 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from torch.nn import Softmax, CrossEntropyLoss
 from safetensors.torch import load_file
-
-# from textbrewer import GeneralDistiller
-# from textbrewer.distiller_utils import *
-# from textbrewer.distiller_basic import BasicDistiller
 
 def softmax_normalize(tensor, dim=-1):
     return F.softmax(tensor, dim=dim)

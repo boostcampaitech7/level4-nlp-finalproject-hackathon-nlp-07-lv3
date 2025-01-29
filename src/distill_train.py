@@ -30,7 +30,7 @@ from models import load_model
 from textbrewer import TrainingConfig, DistillationConfig
 from utils import setup_logger
 from distill_runner import DistillRunner
-from distillation import CustomDistiller, CustomDistiller2
+from distillation import CustomDistiller, CustomDistiller2, CustomDistiller3
 
 def now():
     seoul_tz = pytz.timezone("Asia/Seoul")
@@ -138,10 +138,18 @@ def main():
         else:
             model_T = load_model(model_T_config)
         model_S = load_model(model_S_config)
-        distiller = CustomDistiller2(
+        distiller = CustomDistiller3(
             adaptor_T=simple_adaptor2,
-            adaptor_S=simple_adaptor2
+            adaptor_S=simple_adaptor2,
+            encoder_dim=model_S.speech_Qformer.config.hidden_size,
+            decoder_dim=model_S.llama_model.config.hidden_size
         )
+
+
+        # distiller = CustomDistiller2(
+        #     adaptor_T=simple_adaptor2,
+        #     adaptor_S=simple_adaptor2
+        # )
 
         # distiller = CustomDistiller(
         #                 train_config=TrainingConfig(
