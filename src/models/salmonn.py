@@ -287,7 +287,6 @@ class SALMONN(nn.Module):
                     whisper + CED 길이를 fixed 해서 1280 + 768 = 2048로 설정해놨는데 나눠진걸 배치 수 맞추겠다고 강제로 concat 하면은 이 값이 동적으로 변하기에 당장 3개를 합쳐서 768이어야 할게 2304가 되서 2304 + 1280 = 3584가 되서 2048과 맞지 않아 문제 발생 
                     '''
                     
-
                     # if audio_embeds.shape[0] > speech_embeds.shape[0]:
                     #     split_size = int(audio_embeds.shape[0] / speech_embeds.shape[0])
                     #     print(split_size)
