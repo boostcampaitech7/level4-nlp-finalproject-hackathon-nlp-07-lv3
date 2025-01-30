@@ -173,12 +173,12 @@ def main():
     else:  # load small dummy language model
         return
 
-    # # build stage1 runner
-    # runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
+    # build stage1 runner
+    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
 
-    # # stage1 train, return 마지막 ckpt 경로 넘겨 받음
-    # ckpt_path = runner_1.train()
-    # torch.cuda.empty_cache()
+    # stage1 train, return 마지막 ckpt 경로 넘겨 받음
+    ckpt_path = runner_1.train()
+    torch.cuda.empty_cache()
 
     # stage1 wandb 종료
     wandb.finish()
@@ -199,13 +199,13 @@ def main():
     # stage2 optim 설정으로 바꾸기
     cfg.config.run.optims = optims_2
     cfg.config.run.output_dir = output_dir_2
-    # cfg.config.model_S.ckpt = ckpt_path
+    cfg.config.model_S.ckpt = ckpt_path
 
     # del model_S  
     # torch.cuda.empty_cache() 
     
-    # if not args.dryrun:
-    #     model_S = load_model(model_S_config)
+    if not args.dryrun:
+        model_S = load_model(model_S_config)
     # print config
     cfg.pretty_print()
 
