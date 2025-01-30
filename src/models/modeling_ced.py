@@ -18,12 +18,12 @@ class FrontEnd(nn.Sequential):
     def __init__(self,
                  f_min: int = 0,
                  sample_rate: int = 16000,
-                 win_size: int = 400, # frame_length, BEATs에선 25ms 즉, 400 (본래 CED에서는 512)
+                 win_size: int = 512, # frame_length, BEATs에선 25ms 즉, 400 (본래 CED에서는 512)
                  center: bool = True,
                  n_fft: int = 512, # 주파수 분해능 (주파수 해상도 결정, n_fft ≥ win_length 절대 만족 FFT 시 윈도우 데이터 손실 방지), BEATs에선 25ms 즉, 400 (본래 CED에서는 512)
                  f_max: Optional[int] = None,
                  hop_size: int = 160, # 프레임 간격 (프레임 간 겹침량 결정), 예시) 프레임 겹침 = win_length - hop_length (예: 400샘플 윈도우 - 160 hop → 240샘플(15ms) 겹침)
-                 n_mels: int = 128):
+                 n_mels: int = 64):
         self.f_min = f_min
         self.sample_rate = sample_rate
         self.win_size = win_size
