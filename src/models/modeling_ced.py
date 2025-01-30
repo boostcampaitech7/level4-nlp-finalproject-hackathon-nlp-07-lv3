@@ -8,9 +8,6 @@ from typing import Any, Callable, Optional, Tuple, Union
 from einops import rearrange
 from einops.layers.torch import Rearrange
 
-# import sys
-# sys.path.append('/data/pgt/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/models/CED/models')
-# from .CED.models.audiotransformer import Attention, Block
 from .CED.models import *
 
 class FrontEnd(nn.Sequential):
