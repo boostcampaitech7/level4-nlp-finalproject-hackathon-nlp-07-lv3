@@ -93,7 +93,7 @@ class ExtendedCEDEncoder(AudioTransformer):
     def forward_spectrogram(self, x: torch.Tensor) -> torch.Tensor:
         x = rearrange(x, 'b f t -> b 1 f t')
         x = self.init_bn(x)
-        print("2. {}".format(x.shape))
+        # print("2. {}".format(x.shape))
         if x.shape[-1] > self.maximal_allowed_length:
             splits = x.split(self.target_length, -1)
 
@@ -116,7 +116,7 @@ class ExtendedCEDEncoder(AudioTransformer):
         return x
 
     def forward(self, x):
-        print("1. {}".format(x.shape))
+        # print("1. {}".format(x.shape))
         x = x.float()
         # x = pad_audio(x, self.x.shape[-1])
         x = self.front_end(x)

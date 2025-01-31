@@ -72,16 +72,6 @@ def apply_to_sample(f, sample, device="cuda:0"):
             return {key: _apply(value, device) for key, value in x.items()}
         elif isinstance(x, list):
             return [_apply(x, device) for x in x]
-        # elif isinstance(x, CausalLMOutputWithPast):
-        #     return CausalLMOutputWithPast(
-        #         logits=x.logits.to(device) if x.logits is not None else None,
-        #         past_key_values=tuple(
-        #             tuple(p.to(device) for p in pkv) for pkv in x.past_key_values
-        #         ) if x.past_key_values is not None else None,
-        #         hidden_states=x.hidden_states.to(device) if x.hidden_states is not None else None,
-        #         attentions=x.attentions.to(device) if x.attentions is not None else None,
-        #         loss=x.loss.to(device) if x.loss is not None else None,
-        #     )
         else:
             return x
 

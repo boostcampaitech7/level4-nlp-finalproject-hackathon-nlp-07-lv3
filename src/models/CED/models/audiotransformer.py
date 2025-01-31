@@ -287,30 +287,30 @@ class AudioTransformer(nn.Module):
             nn.init.constant_(module.weight, 1.0)
 
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
-        print("3. {}".format(x.shape))
+        # print("3. {}".format(x.shape))
         x = self.patch_embed(x)
-        print("4. {}".format(x.shape))
+        # print("4. {}".format(x.shape))
         b, c, f, t = x.shape
         x = x + self.time_pos_embed[:, :, :, :t]
-        print("5. {}".format(x.shape))
+        # print("5. {}".format(x.shape))
         x = x + self.freq_pos_embed[:, :, :, :]  # Just to support __getitem__ in posembed
-        print("6. {}".format(x.shape))
+        # print("6. {}".format(x.shape))
         if self.training and self.time_patch_out is not None:
             x = drop_patches(x, dim=-1, frac=self.time_patch_out)
         if self.training and self.freq_patch_out is not None:
             x = drop_patches(x, dim=-2, frac=self.freq_patch_out)
-        print("7. {}".format(x.shape))
+        # print("7. {}".format(x.shape))
         x = rearrange(x, 'b c f t -> b (f t) c')
-        print("8. {}".format(x.shape))
+        # print("8. {}".format(x.shape))
         if self.pooling == 'token':
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)
             cls_token = cls_token + self.token_pos_embed
             x = torch.cat((cls_token, x), dim=1)
-        print("9. {}".format(x.shape))
+        # print("9. {}".format(x.shape))
         x = self.pos_drop(x) # drop-out
         x = self.blocks(x) # input_dims = output_dims (x 차원 변화 없음)
         x = self.norm(x)
-        print("10. {}".format(x.shape))
+        # print("10. {}".format(x.shape))
         return x
 
     def forward_head(self, x: torch.Tensor) -> torch.Tensor:
@@ -406,7 +406,7 @@ class AudioTransformer(nn.Module):
         return x
 
     def forward(self, x):
-        print("1. {}".format(x.shape))
+        # print("1. {}".format(x.shape))
         if self.training:
             x = self.wavtransforms(x.unsqueeze(1)).squeeze(1) # torch_audiomentations as wavtransforms
         x = self.front_end(x) # audio_transforms.MelSpectrogram + audio_transforms.AmplitudeToDB
