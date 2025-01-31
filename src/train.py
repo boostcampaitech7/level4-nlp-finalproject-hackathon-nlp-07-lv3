@@ -39,6 +39,7 @@ def now():
 def parse_args():
     parser = argparse.ArgumentParser(description="train parameters")
     parser.add_argument("--cfg-path", type=str, required=True, help="path to configuration file")
+    parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -142,38 +143,38 @@ def main():
     # stage1 wandb 종료
     wandb.finish()
 
-    # build stage2 datasets
-    # 별도로 valid 지정 없는 경우 train만 생성 후 split
-    if data_config.valid_ann_path_2:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
-            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path),
-        }
+    # # build stage2 datasets
+    # # 별도로 valid 지정 없는 경우 train만 생성 후 split
+    # if data_config.valid_ann_path_2:
+    #     datasets = {
+    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
+    #         "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path),
+    #     }
 
-    else:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
-        }
+    # else:
+    #     datasets = {
+    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
+    #     }
 
-    # stage2 optim 설정으로 바꾸기
-    cfg.config.run.optims = optims_2
-    cfg.config.run.output_dir = output_dir_2
-    cfg.config.model.ckpt = ckpt_path
+    # # stage2 optim 설정으로 바꾸기
+    # cfg.config.run.optims = optims_2
+    # cfg.config.run.output_dir = output_dir_2
+    # cfg.config.model.ckpt = ckpt_path
 
-    # print config
-    cfg.pretty_print()
+    # # print config
+    # cfg.pretty_print()
 
-    # Wandb setup, stage2 wandb 시작
-    if wandb_config.log:
-        wandb.init(
-            project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_" + exp_name, config=cfg
-        )
+    # # Wandb setup, stage2 wandb 시작
+    # if wandb_config.log:
+    #     wandb.init(
+    #         project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_" + exp_name, config=cfg
+    #     )
 
-    # build stage2 runner
-    runner_2 = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
+    # # build stage2 runner
+    # runner_2 = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
 
-    # stage2 train
-    runner_2.train()
+    # # stage2 train
+    # runner_2.train()
 
 
 if __name__ == "__main__":
