@@ -111,9 +111,6 @@ def main():
 
     print(f"Global rank: {global_rank}")
 
-    # print config
-    #cfg.pretty_print()
-
     # build stage1 datasets
     # 별도로 valid 지정 없는 경우 train만 생성 후 split
     if data_config.valid_ann_path_1:

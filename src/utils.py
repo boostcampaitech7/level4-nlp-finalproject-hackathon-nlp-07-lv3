@@ -40,7 +40,7 @@ def setup_logger():
 
 def get_dataloader(dataset, config, is_train=True, use_distributed=True):
     if use_distributed:
-        sampler = DistributedSampler(dataset, shuffle=is_train, num_replicas=get_world_size(), rank=get_rank())
+        sampler = DistributedSampler(dataset, shuffle=False, num_replicas=get_world_size(), rank=get_rank())
     else:
         sampler = None
 
@@ -50,7 +50,7 @@ def get_dataloader(dataset, config, is_train=True, use_distributed=True):
         num_workers=config.num_workers,
         pin_memory=True,
         sampler=sampler,
-        shuffle=sampler is None and is_train,
+        shuffle=False,
         collate_fn=dataset.collater,
         drop_last=is_train,
     )
