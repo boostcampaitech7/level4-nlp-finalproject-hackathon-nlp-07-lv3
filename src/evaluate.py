@@ -22,7 +22,7 @@ from models.modeling_canary import get_dataloader_from_config
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cfg-path", type=str, help="path to configuration file", default="salmonn_eval_config.yaml")
-    parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--device", type=str, default="cuda:1")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -141,9 +141,9 @@ def main(args):
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
 
-        n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda')
-        raw_wav = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda')
-        audio_padding_mask = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda')
+        n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda:1')
+        raw_wav = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda:1')
+        audio_padding_mask = salmonn_preprocessor.move_data_to_device(raw_wav, 'cuda:1')
 
         speech_embeds, speech_atts = salmonn_preprocessor.encode_speech(
             n_samples, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask

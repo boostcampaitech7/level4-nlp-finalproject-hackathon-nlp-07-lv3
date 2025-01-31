@@ -35,30 +35,6 @@ from .utils import StoppingCriteriaSub
 from torch.profiler import profile, ProfilerActivity
 from nemo.collections.asr.models import EncDecMultiTaskModel
 
-current_dir = os.getcwd()
-current_time = time.strftime("%Y%m%d_%H%M", time.localtime())
-whisper_log_path = os.path.join(current_dir, "src", "log", f"{current_time}", "whisper_log")
-beats_log_path = os.path.join(current_dir, "src", "log", f"{current_time}", "beats_log")
-qformer_log_path = os.path.join(current_dir, "src", "log", f"{current_time}", "qformer_log")
-llama_log_path = os.path.join(current_dir, "src", "log", f"{current_time}", "llama_log")
-
-os.makedirs(whisper_log_path, exist_ok=True)
-os.makedirs(beats_log_path, exist_ok=True)
-os.makedirs(qformer_log_path, exist_ok=True)
-os.makedirs(llama_log_path, exist_ok=True)
-
-whisper_profiler = profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-                     on_trace_ready=torch.profiler.tensorboard_trace_handler(whisper_log_path), profile_memory=True, with_flops=True)
-
-beats_profiler = profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-                        on_trace_ready=torch.profiler.tensorboard_trace_handler(beats_log_path), profile_memory=True, with_flops=True)
-
-qformer_profiler = profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-                        on_trace_ready=torch.profiler.tensorboard_trace_handler(qformer_log_path), profile_memory=True, with_flops=True)
-
-llama_profiler = profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU],
-                        on_trace_ready=torch.profiler.tensorboard_trace_handler(llama_log_path), profile_memory=True, with_flops=True)
-
 class SALMONN(nn.Module):
     @classmethod
     def init_speech_Qformer(cls, num_query_token, speech_width, num_hidden_layers=2):
@@ -170,7 +146,6 @@ class SALMONN(nn.Module):
                     r=lora_rank,
                     lora_alpha=lora_alpha,
                     lora_dropout=lora_dropout,
-                    target_modules=['model.layers.27.self_attn.q_proj', 'model.layers.27.self_attn.v_proj'],
                 )
                 self.llama_model = get_peft_model(self.llama_model, self.peft_config)
                 self.llama_model.print_trainable_parameters()
@@ -312,31 +287,12 @@ class SALMONN(nn.Module):
             return inputs
 
     def _encode_auditory_feature(self, speech_embeds, audio_embeds=None):
-        if self.profile_flag:
-            qformer_profiler.__enter__()
-            logging.info("Start Q-Former Encoding")
-
         with self.maybe_autocast():
             if self.use_speech_Qformer:
                 speech_embeds = self.ln_speech(speech_embeds)
 
-                canary_output_dim = speech_embeds.size(-1)
-                qformer_input_dim = self.speech_Qformer.config.hidden_size
-
-                if canary_output_dim != qformer_input_dim:
-                    # 차원 조정을 위한 선형 투영층 추가
-                    self.dimension_adjuster = nn.Linear(canary_output_dim, qformer_input_dim).to(speech_embeds.device)
-                    speech_embeds = self.dimension_adjuster(speech_embeds)
-
-                    speech_embeds = self.ln_speech(speech_embeds)
-
                 if audio_embeds is not None:
                     audio_embeds = self.ln_audio(audio_embeds)
-
-                    # # check if first dimension (Batch Size, Time stamp, Hidden Lens) is different
-                    # # if different, repeat audio_embeds to match speech_embeds
-                    # if audio_embeds.size(0) != speech_embeds.size(0):
-                    #     audio_embeds = audio_embeds.repeat(speech_embeds.size(0), 1, 1)
 
                     # 두 임베딩 값의 크기를 맞춰서 padding
                     if audio_embeds.size(1) < speech_embeds.size(1):
@@ -352,8 +308,8 @@ class SALMONN(nn.Module):
                 # 이를 위해서 인코더 결과값들을 슬라이딩 윈도우 방식으로 나누어서 처리하여 가변적인 값들도 QFormer을 이용해서 처리할 수 있게 적용
                 if self.window_level_Qformer:
                     B, T, C = speech_embeds.shape
-                    kernel = round(1500 * self.second_per_window / 30.0)
-                    stride = round(1500 * self.second_stride / 30.0)
+                    kernel = round(T * self.second_per_window / 30.0)
+                    stride = round(T * self.second_stride / 30.0)
                     kernel = (1, kernel)
                     stride = (1, stride)
                     speech_embeds_tr = speech_embeds.transpose(1, 2).unsqueeze(2)
@@ -385,87 +341,30 @@ class SALMONN(nn.Module):
             else:
                 raise NotImplementedError
 
-        if self.profile_flag:
-            qformer_profiler.__exit__(None, None, None)
-
-        #print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
-        #time.sleep(1e-3)
-
         return speech_embeds, speech_atts
 
     def encode_speech(self, n_samples, raw_wav=None, audio_padding_mask=None):
         with self.maybe_autocast():
-            if self.profile_flag:
-                whisper_profiler.__enter__()
-                logging.info("Start Canary Encoding")
+            input_signal, input_signal_length, = n_samples.audio, n_samples.audio_lens
 
-                input_signal, input_signal_length, = n_samples.audio, n_samples.audio_lens
+            processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
+                input_signal=input_signal, length=input_signal_length
+            )
 
-                processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
-                    input_signal=input_signal, length=input_signal_length
-                )
+            encoded, encoded_len = self.speech_encoder.encoder(audio_signal=processed_signal, length=processed_signal_length)
 
-                encoded, encoded_len = self.speech_encoder.encoder(audio_signal=processed_signal, length=processed_signal_length)
-
-                if hasattr(self, 'embed_positions'):
-                    embed_pos = self.embed_positions.weight
-                    speech_embeds = encoded + embed_pos
-                else:
-                    speech_embeds = encoded
-
-                speech_embeds = torch.permute(speech_embeds, [0, 2, 1])
-                speech_embeds = nn.functional.dropout(speech_embeds, p=0.0, training=True)
-                speech_embeds = self.ln_speech(speech_embeds)
-
-                # processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
-                #     input_signal=spectrogram,
-                #     length=spectrogram_len
-                # )
-
-                # encoder_output = self.speech_encoder(
-                #     audio_signal=processed_signal, length=processed_signal_length
-                # )
-
-                whisper_profiler.__exit__(None, None, None)
-
+            if hasattr(self, 'embed_positions'):
+                embed_pos = self.embed_positions.weight
+                speech_embeds = encoded + embed_pos
             else:
-                #speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
+                speech_embeds = encoded
 
-                spectrogram, spectrogram_len, = n_samples.audio, n_samples.audio_lens
-                #spectrogram = spectrogram.to('cuda')
-
-                input_signal, input_signal_length, = n_samples.audio, n_samples.audio_lens
-
-                processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
-                    input_signal=input_signal, length=input_signal_length
-                )
-
-                encoded, encoded_len = self.speech_encoder.encoder(audio_signal=processed_signal, length=processed_signal_length)
-
-                if hasattr(self, 'embed_positions'):
-                    embed_pos = self.embed_positions.weight
-                    speech_embeds = encoded + embed_pos
-                else:
-                    speech_embeds = encoded
-
-                speech_embeds = torch.permute(speech_embeds, [0, 2, 1])
-                speech_embeds = nn.functional.dropout(speech_embeds, p=0.0, training=True)
-                speech_embeds = self.ln_speech(speech_embeds)
+            speech_embeds = torch.permute(speech_embeds, [0, 2, 1])
 
             if self.beats_path and n_samples.audio is not None:
-                if self.profile_flag:
-                    beats_profiler.__enter__()
-                    logging.info("Start BEATs Encoding")
-
-                    audio_embeds, _ = self.beats.extract_features(
-                        raw_wav, padding_mask=audio_padding_mask, feature_only=True
-                    )
-                    beats_profiler.__exit__(None, None, None)
-
-                else:
-                    audio_embeds, _ = self.beats.extract_features(
-                        raw_wav, padding_mask=audio_padding_mask, feature_only=True
-                    )
+                audio_embeds, _ = self.beats.extract_features(
+                    raw_wav, padding_mask=audio_padding_mask, feature_only=True
+                )
 
             else:
                 audio_embeds = None
@@ -535,14 +434,12 @@ class SALMONN(nn.Module):
 
     def forward(self, samples, n_samples, verbose=False, profile_flag=False):
         self.profile_flag = profile_flag
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
         raw_wav = samples.get("raw_wav", None)
         audio_padding_mask = samples.get("padding_mask", None)
 
         n_samples = self.move_data_to_device(n_samples, device)
-        audio_padding_mask = self.move_data_to_device(audio_padding_mask, device)
-        raw_wav = self.move_data_to_device(raw_wav, device)
 
         # detect whether there are multi tasks in this batch
         task = list(set(samples["task"]))
@@ -629,10 +526,6 @@ class SALMONN(nn.Module):
         attention_mask = torch.cat([atts_bos, speech_atts, to_regress_tokens.attention_mask], dim=1)
 
         # calulate loss
-        if self.profile_flag:
-            llama_profiler.__enter__()
-            logging.info("Start LLaMa Encoding")
-
         with self.maybe_autocast():
             outputs = self.llama_model(
                 inputs_embeds=inputs_embeds,
@@ -641,9 +534,6 @@ class SALMONN(nn.Module):
                 labels=targets,
             )
             loss = outputs.loss
-
-        if self.profile_flag:
-            llama_profiler.__exit__(None, None, None)
 
         if verbose:
             nvocab = self.llama_model.config.vocab_size

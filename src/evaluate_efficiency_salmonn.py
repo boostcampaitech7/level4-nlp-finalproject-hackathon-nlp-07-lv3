@@ -86,7 +86,7 @@ def parse_args():
         default="/root/np-app-audiolm-evaluator/salmonn_eval_config.yaml",
     )
 
-    parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--device", type=str, default="cuda:1")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -191,7 +191,7 @@ def main(args):
     sample_batch = prepare_sample(sample_batch, cuda_enabled=torch.cuda.is_available())
 
     n_samples = next(n_loader_test._get_iterator())
-    n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda')
+    n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda:1')
 
     # Measure memory and latency
     memory_usages = []
@@ -210,7 +210,7 @@ def main(args):
                 salmonn_preprocessor,
             )
         torch.cuda.synchronize()
-        after_memory_allocated = torch.cuda.max_memory_allocated(device='cuda')
+        after_memory_allocated = torch.cuda.max_memory_allocated(device='cuda:1')
 
         torch.cuda.empty_cache()  # Clear the cache to get more accurate measurements
         gc.collect()

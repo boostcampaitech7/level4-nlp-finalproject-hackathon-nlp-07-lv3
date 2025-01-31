@@ -41,12 +41,12 @@ class Runner:
 
         # settings
         #self.device = torch.device(self.config.config.run.device)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
         self.use_distributed = self.config.config.run.use_distributed
         self.start_epoch = 0
         self.max_epoch = self.config.config.run.optims.max_epoch
         self.evaluate_only = self.config.config.run.evaluate
-        self.cuda_enabled = self.device.type == "cuda"
+        self.cuda_enabled = self.device.type == "cuda:1"
 
         # test prompt
         self.prompt_template = self.config.config.model.get("prompt_template", "")

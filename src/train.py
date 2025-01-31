@@ -124,7 +124,6 @@ def main():
             "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
         }
 
-
     # build model
     if not args.dryrun:
         model = load_model(model_config)
@@ -160,15 +159,12 @@ def main():
     cfg.config.run.output_dir = output_dir_2
     cfg.config.model.ckpt = ckpt_path
 
-    # print config
-    #cfg.pretty_print()
-
     # Wandb setup, stage2 wandb 시작
     if wandb_config.log:
         wandb.init(
             project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_" + exp_name, config=cfg
         )
-        
+
     # model_config 재설정: stage-1 ckpt 넘겨받기
     model_config = cfg.config.model
 

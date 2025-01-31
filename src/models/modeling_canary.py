@@ -107,7 +107,7 @@ class ExtendedCanaryEncoder(nn.Module):
 @dataclass
 class InternalTranscribeConfig:
     # Internal values
-    device: Optional[torch.device] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device: Optional[torch.device] = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     dtype: Optional[torch.dtype] = None
     training_mode: bool = False
     logging_level: Optional[Any] = None
@@ -190,7 +190,7 @@ def get_transcribe_config(manifest_filepath, batch_size, transcribe_cfg: Transcr
             verbose=True,
             timestamps=None,
             _internal=InternalTranscribeConfig(
-                device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu"),
                 dtype = None,
                 training_mode = False,
                 logging_level = None,
@@ -206,55 +206,6 @@ def get_transcribe_config(manifest_filepath, batch_size, transcribe_cfg: Transcr
         )
 
     return transcribe_cfg
-
-def train_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda'):
-    config, _ = get_dataloader_from_config(speaker_model, manifest_file)
-
-    speaker_model.setup_training_data(config)
-
-    return speaker_model
-
-def test_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda'):
-    config, _ = get_dataloader_from_config(speaker_model, manifest_file)
-
-    speaker_model.setup_test_data(config)
-
-    return speaker_model
-
-def valid_setup(speaker_model : EncDecMultiTaskModel, manifest_file, device='cuda'):
-    config, _ = get_dataloader_from_config(speaker_model, manifest_file)
-
-    speaker_model.setup_validation_data(config)
-
-    return speaker_model
-
-def execute_model(speaker_model : EncDecMultiTaskModel, transcribe_cfg, device='cuda'):
-
-    for test_batch in tqdm(speaker_model.val_dataloader(), desc="Transcribing", disable=not transcribe_cfg.verbose):
-        # Move batch to device
-        # Run forward pass
-        with autocast():
-            test_batch = move_data_to_device(test_batch, transcribe_cfg._internal.device)
-            spectrogram, spectrogram_len, = test_batch.audio, test_batch.audio_lens
-            spectrogram = spectrogram.to(device)
-
-            log_probs, encoded_len, speech_embeds, enc_mask = speaker_model.forward(input_signal=spectrogram, input_signal_length=spectrogram_len)
-
-    return speech_embeds
-
-
-def build_models(canary_path : str, train_manifest_path : str, valid_manifest_path : str, test_manifest_path : str, device : str):
-    canary_model = EncDecMultiTaskModel.from_pretrained(canary_path)
-
-    canary_model = train_setup(canary_model, train_manifest_path, device)
-    canary_model = valid_setup(canary_model, valid_manifest_path, device)
-    canary_model = test_setup(canary_model, test_manifest_path, device)
-
-    canary_model = canary_model.to(device)
-
-    return canary_model
-
-
 
 # manifest_filepath = os.path.join(os.getcwd(), 'src', 'models', 'manifest.json')
 # device = 'cuda'

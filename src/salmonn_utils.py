@@ -34,17 +34,12 @@ class SALMONNTestDataset(Dataset):
 
         self.annotation = json.load(open(ann_path, "r"))["annotation"]
 
-        self.wav_processor = WhisperFeatureExtractor.from_pretrained(whisper_path)
-
         self.task = task
 
     def __len__(self):
         return len(self.annotation)
 
     def collater(self, samples):
-        samples_spectrogram = [s["spectrogram"] for s in samples]
-        cat_spectrogram = torch.stack(samples_spectrogram, dim=0)
-
         raw_wav = [torch.from_numpy(s["raw_wav"]) for s in samples]
         raw_wav_length = torch.tensor([len(s["raw_wav"]) for s in samples])
         raw_wav = pad_sequence(raw_wav, batch_first=True, padding_value=0)
@@ -57,7 +52,6 @@ class SALMONNTestDataset(Dataset):
 
         entity = {
             "testset_id": testset_id,
-            "spectrogram": cat_spectrogram,
             "raw_wav": raw_wav,
             "padding_mask": paddding_mask,
             "task": task,
@@ -91,20 +85,15 @@ class SALMONNTestDataset(Dataset):
             sil = np.zeros(sr - len(audio), dtype=float)
             audio = np.concatenate((audio, sil), axis=0)
 
-        if sr != self.wav_processor.sampling_rate:  # TODO. use more efficient implementation
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=self.wav_processor.sampling_rate)
-            sr = self.wav_processor.sampling_rate
-
+        assert sr == 16000
         audio = audio[: sr * 30]  # truncate audio to at most 30s
 
-        spectrogram = self.wav_processor(audio, sampling_rate=sr, return_tensors="pt")["input_features"].squeeze()
         testset_id = ann["testset_id"]
         task = ann.get("task", "asr")
         Q = ann.get("Q", "")
 
         entity = {
             "testset_id": testset_id,
-            "spectrogram": spectrogram,
             "raw_wav": audio,
             "task": task,
             "Q": Q,
