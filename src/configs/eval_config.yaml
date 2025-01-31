@@ -8,7 +8,7 @@ model:
   token: "" # 허깅페이스 토큰
   only_preprocessor: False
 
-  ckpt: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_2/202501221021/checkpoint_best.pth" # stage2 마친 모델 .ckpt or .pth
+  ckpt: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_1/CanaryASRTrained_V1.0.0/checkpoint_0.pth" # stage2 마친 모델 .ckpt or .pth
   #ckpt: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_2/salmonn_3b_nota.pth" # stage2 마친 모델 .ckpt or .pth
 
   freeze_whisper: True

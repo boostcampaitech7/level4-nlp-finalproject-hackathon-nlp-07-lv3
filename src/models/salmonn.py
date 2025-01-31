@@ -62,7 +62,8 @@ llama_profiler = profile(activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU
 class SALMONN(nn.Module):
     @classmethod
     def init_speech_Qformer(cls, num_query_token, speech_width, num_hidden_layers=2):
-        encoder_config = BertConfig.from_pretrained("bert-base-uncased")
+        #encoder_config = BertConfig.from_pretrained("bert-base-uncased")
+        encoder_config = BertConfig.from_pretrained("google-bert/bert-large-uncased")
         encoder_config.num_hidden_layers = num_hidden_layers
         encoder_config.encoder_width = speech_width
         # insert cross-attention layer every other block
@@ -169,6 +170,7 @@ class SALMONN(nn.Module):
                     r=lora_rank,
                     lora_alpha=lora_alpha,
                     lora_dropout=lora_dropout,
+                    target_modules=['model.layers.27.self_attn.q_proj', 'model.layers.27.self_attn.v_proj'],
                 )
                 self.llama_model = get_peft_model(self.llama_model, self.peft_config)
                 self.llama_model.print_trainable_parameters()

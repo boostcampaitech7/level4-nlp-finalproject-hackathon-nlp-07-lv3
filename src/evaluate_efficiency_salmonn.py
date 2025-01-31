@@ -41,7 +41,6 @@ class MockDataset(SALMONNDataset):
         self.audio_length = audio_length
         self.dataset_length = dataset_length
         self.prefix = cfg.config.datasets.prefix
-        self.wav_processor = WhisperFeatureExtractor.from_pretrained(cfg.config.datasets.whisper_path)
         self.random_sample = np.random.randn(self.sr * self.audio_length)
 
     def __len__(self):
@@ -49,9 +48,7 @@ class MockDataset(SALMONNDataset):
 
     def __getitem__(self, idx):
         audio = self.random_sample.copy()
-        spectrogram = self.wav_processor(audio, sampling_rate=self.sr, return_tensors="pt")["input_features"].squeeze()
         return {
-            "spectrogram": spectrogram,
             "raw_wav": audio,
             "text": "test",
             "task": "asr",
@@ -173,10 +170,7 @@ def main(args):
     sample_batch = prepare_sample(sample_batch, cuda_enabled=torch.cuda.is_available())
 
     n_samples = next(n_loader_test._get_iterator())
-
     n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda')
-    sample_batch["raw_wav"] = salmonn_preprocessor.move_data_to_device(sample_batch["raw_wav"], 'cuda')
-    sample_batch["padding_mask"] = salmonn_preprocessor.move_data_to_device(sample_batch["padding_mask"], 'cuda')
 
     # Measure memory and latency
     memory_usages = []
