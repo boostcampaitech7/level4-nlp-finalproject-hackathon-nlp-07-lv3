@@ -61,33 +61,43 @@ def get_dataloader(dataset, config, is_train=True, use_distributed=True):
     return loader
 
 
-def apply_to_sample(f, sample):
+def apply_to_sample(f, sample, device="cuda:0"):
     if len(sample) == 0:
         return {}
 
-    def _apply(x):
+    def _apply(x, device):
         if torch.is_tensor(x):
-            return f(x)
+            return f(x, device)
         elif isinstance(x, dict):
-            return {key: _apply(value) for key, value in x.items()}
+            return {key: _apply(value, device) for key, value in x.items()}
         elif isinstance(x, list):
-            return [_apply(x) for x in x]
+            return [_apply(x, device) for x in x]
+        # elif isinstance(x, CausalLMOutputWithPast):
+        #     return CausalLMOutputWithPast(
+        #         logits=x.logits.to(device) if x.logits is not None else None,
+        #         past_key_values=tuple(
+        #             tuple(p.to(device) for p in pkv) for pkv in x.past_key_values
+        #         ) if x.past_key_values is not None else None,
+        #         hidden_states=x.hidden_states.to(device) if x.hidden_states is not None else None,
+        #         attentions=x.attentions.to(device) if x.attentions is not None else None,
+        #         loss=x.loss.to(device) if x.loss is not None else None,
+        #     )
         else:
             return x
 
-    return _apply(sample)
+    return _apply(sample, device)
 
 
-def move_to_cuda(sample):
-    def _move_to_cuda(tensor):
-        return tensor.cuda()
+def move_to_cuda(sample, device="cuda:0"):
+    def _move_to_cuda(tensor, device):
+        return tensor.to(device)
 
-    return apply_to_sample(_move_to_cuda, sample)
+    return apply_to_sample(_move_to_cuda, sample, device)
 
 
-def prepare_sample(samples, cuda_enabled=True):
+def prepare_sample(samples, cuda_enabled=True, device="cuda:0"):
     if cuda_enabled:
-        samples = move_to_cuda(samples)
+        samples = move_to_cuda(samples, device)
 
     # TODO fp16 support
 
