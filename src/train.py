@@ -168,6 +168,17 @@ def main():
         wandb.init(
             project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_" + exp_name, config=cfg
         )
+        
+    # model_config 재설정: stage-1 ckpt 넘겨받기
+    model_config = cfg.config.model
+
+    # stage-1 ckpt 대로 model 다시 로드
+    if not args.dryrun:
+        model = load_model(model_config)
+    else:  # load small dummy language model
+        from transformers import AutoModelForCausalLM
+        model = AutoModelForCausalLM.from_pretrained("apple/OpenELM-270M-Instruct", trust_remote_code=True)
+
 
     # build stage2 runner
     runner_2 = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)

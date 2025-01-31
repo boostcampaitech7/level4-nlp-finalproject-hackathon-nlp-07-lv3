@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import json
+import logging
+import os
 
 import librosa
 import numpy as np
@@ -28,10 +30,15 @@ class SALMONNDataset(Dataset):
     def __init__(self, prefix, ann_path, whisper_path):
         super().__init__()
 
+        # 경로 검증: 절대 경로인지 확인
+        if not os.path.isabs(prefix):
+            raise ValueError(
+                f"Provided prefix path '{prefix}' is not an absolute path. "
+                "Please provide an absolute path to the dataset. fix run.prefix which is in configs/train.yaml"
+            )
+
         self.prefix = prefix
-
         self.annotation = json.load(open(ann_path, "r"))["annotation"]
-
         self.wav_processor = WhisperFeatureExtractor.from_pretrained(whisper_path)
 
     def __len__(self):
@@ -63,10 +70,24 @@ class SALMONNDataset(Dataset):
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        audio_path = self.prefix + '/' + ann["path"]
-        audio, sr = sf.read(audio_path)
+        audio_path = self.prefix + "/" + ann["path"]
 
-        if len(audio.shape) == 2: # stereo to mono
+        # 경로 및 오디오 로드 확인
+        try:
+            audio, sr = sf.read(audio_path)
+        except sf.LibsndfileError as e:
+            logging.error(f"LibsndfileError: {e}")
+            logging.error(f"Exception details: {e.args}")
+            logging.error(f"Failed to load audio file: {audio_path}")
+
+            try:
+                print(f"Failed to load {audio_path}: {e}. Loading 0-th sample instead.")
+                audio, sr = sf.read(self.prefix + self.annotation[0]["path"])
+            except (IOError, sf.SoundFileError) as e:
+                print(f"Failed to load 0-th sample as well: {e}. Returning empty audio.")
+                audio, sr = np.array([]), 44100  # 빈 오디오와 기본 샘플레이트 반환
+
+        if len(audio.shape) == 2:  # stereo to mono
             audio = audio[:, 0]
 
         if len(audio) < sr:  # pad audio to at least 1s

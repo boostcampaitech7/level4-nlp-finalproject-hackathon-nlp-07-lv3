@@ -1,11 +1,12 @@
 # This script is based on https://github.com/salesforce/LAVIS/blob/main/lavis/runners/runner_base.py
-
 import copy
 import datetime
 import glob
 import json
 import logging
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -359,20 +360,13 @@ class Runner:
         start_time = time.time()
         best_agg_metric = 0
         best_epoch = 0
-
-        # testing phase
-        start, mid, end = 0, (self.start_epoch + self.max_epoch - 1) // 2, self.max_epoch - 1
-        save_directory = ""
+        best_save_directory = None  # 가장 좋은 모델 경로를 추적
 
         for cur_epoch in range(self.start_epoch, self.max_epoch):
             # training phase
             logging.info("Training Phase")
 
-            if cur_epoch == start or cur_epoch == mid or cur_epoch == end:
-                train_stats = self.train_epoch(cur_epoch, profile_flag=True)
-
-            else:
-                train_stats = self.train_epoch(cur_epoch, profile_flag=False)
+            train_stats = self.train_epoch(cur_epoch, profile_flag=False)
 
             self.log_stats(train_stats, split_name="train")
 
@@ -392,7 +386,8 @@ class Runner:
                         best_agg_metric = agg_metrics
                         best_epoch = cur_epoch
 
-                        save_directory = self.save_checkpoint(cur_epoch, is_best=True)
+                        # 평가 메트릭을 통해서 Best 모델인 경우 저장
+                        best_save_directory = self.save_checkpoint(cur_epoch, is_best=True)
 
                     valid_log.update({"best_epoch": best_epoch})
                     self.log_stats(valid_log, split_name="valid")
@@ -401,7 +396,8 @@ class Runner:
             if self.use_distributed:
                 dist.barrier()
 
-        save_directory = self.save_checkpoint(cur_epoch, is_best=False)
+        # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
+        last_save_directory = self.save_checkpoint(cur_epoch, is_best=False)
 
         if self.evaluate_only:
             test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
@@ -412,8 +408,7 @@ class Runner:
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
 
-        assert(save_directory != "")
-        return save_directory
+        return best_save_directory if best_save_directory is not None else last_save_directory
 
     @main_process
     def log_config(self):
@@ -467,3 +462,7 @@ class Runner:
                 logging.info(f"Removed old checkpoint {oldest_checkpoint}.")
 
         return save_to
+
+
+if __name__ == "__main__":
+    subprocess.run([f"{sys.executable}", "train.py", "--cfg-path", "./configs/train.yaml"])
