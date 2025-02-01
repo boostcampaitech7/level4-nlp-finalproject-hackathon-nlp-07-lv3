@@ -160,9 +160,6 @@ def main():
     cfg.config.run.output_dir = output_dir_2
     cfg.config.model.ckpt = ckpt_path
 
-    # del model
-    # torch.cuda.empty_cache() 
-
     if not args.dryrun:
         model = load_model(model_config)
     else:  # load small dummy language model

@@ -146,7 +146,6 @@ def main():
         #     device=run_config.device
         # )
 
-
         # distiller = CustomDistiller2(
         #     adaptor_T=simple_adaptor2,
         #     adaptor_S=simple_adaptor2
@@ -156,10 +155,7 @@ def main():
                         train_config=TrainingConfig(
                             device=run_config.device
                         ),
-                        distill_config=DistillationConfig(
-                            # hard_label_weight=0.5,
-                            # kd_loss_weight=0.5
-                        ),
+                        distill_config=DistillationConfig(),
                         model_T=model_T,
                         model_S=model_S,
                         adaptor_T=simple_adaptor,
@@ -200,10 +196,6 @@ def main():
     cfg.config.run.optims = optims_2
     cfg.config.run.output_dir = output_dir_2
     cfg.config.model_S.ckpt = ckpt_path
-
-    # del model_S  
-    # torch.cuda.empty_cache() 
-    
     if not args.dryrun:
         model_S = load_model(model_S_config)
     # print config
