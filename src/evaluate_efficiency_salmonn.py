@@ -186,7 +186,7 @@ def main(args):
     # 디버깅용 num_workers = 0
     dataloader = MockDataset.make_mock_dataloader(cfg, sr=16000, audio_length=10, num_workers=0)
     sample_batch = next(iter(dataloader))
-    sample_batch = prepare_sample(sample_batch, cuda_enabled=torch.cuda.is_available())
+    sample_batch = prepare_sample(sample_batch, cuda_enabled=torch.cuda.is_available(), device=cfg.config.run.device)
 
     # Measure memory and latency
     memory_usages = []
@@ -194,6 +194,8 @@ def main(args):
     ttfts = []
     tpots = []
 
+    device = torch.device(cfg.config.run.device)
+    torch.cuda.set_device(device.index)
     for it in tqdm(range(args.num_it + args.num_warmup)):
         torch.cuda.synchronize()
         with torch.no_grad():
