@@ -77,6 +77,14 @@ class SALMONNDataset(Dataset):
         except sf.LibsndfileError as e:
             logging.error(f"LibsndfileError: {e}")
             logging.error(f"Exception details: {e.args}")
+            logging.error(f"Failed to load audio file: {audio_path}")
+
+            try:
+                print(f"Failed to load {audio_path}: {e}. Loading 0-th sample instead.")
+                audio, sr = sf.read(self.prefix + self.annotation[0]["path"])
+            except (IOError, sf.SoundFileError) as e:
+                print(f"Failed to load 0-th sample as well: {e}. Returning empty audio.")
+                audio, sr = np.array([]), 44100  # 빈 오디오와 기본 샘플레이트 반환
 
         if len(audio.shape) == 2:  # stereo to mono
             audio = audio[:, 0]
