@@ -18,7 +18,7 @@ from utils import get_dataloader, prepare_sample
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cfg-path", type=str, help="path to configuration file", default="salmonn_eval_config.yaml")
-    parser.add_argument("--device", type=str, default="cuda:0")
+    # parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -121,7 +121,7 @@ def main(args):
         testset_ids.extend(testset_id)
 
         # Preprocess
-        samples = prepare_sample(samples, cuda_enabled=torch.cuda.is_available())
+        samples = prepare_sample(samples, cuda_enabled=torch.cuda.is_available(), device=cfg.config.run.device)
         batch_size = samples["spectrogram"].shape[0]
         spectrogram = samples["spectrogram"]
         raw_wav = samples.get("raw_wav", None)
