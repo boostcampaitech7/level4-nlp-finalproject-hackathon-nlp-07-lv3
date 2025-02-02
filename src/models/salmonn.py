@@ -168,7 +168,6 @@ class SALMONN(nn.Module):
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
                     num_query_token=num_speech_query_token,
                     speech_width=self.speech_encoder.config.d_model + self.beats.embed_dim
-                    # speech_width=self.speech_encoder.config.d_model + self.beats.cfg.encoder_embed_dim,
                 )
             else:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
@@ -298,9 +297,6 @@ class SALMONN(nn.Module):
             # non-speech
             if self.beats_path and raw_wav is not None:
                 audio_embeds = self.beats.forward(raw_wav)
-                # audio_embeds, _ = self.beats.extract_features(
-                #     raw_wav, padding_mask=audio_padding_mask, feature_only=True
-                # )
             else:
                 audio_embeds = None
 

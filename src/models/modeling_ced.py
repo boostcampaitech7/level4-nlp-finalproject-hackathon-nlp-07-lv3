@@ -116,7 +116,6 @@ class ExtendedCEDEncoder(AudioTransformer):
         return x
 
     def forward(self, x):
-        # print("1. {}".format(x.shape))
         x = x.float()
         # x = pad_audio(x, self.x.shape[-1])
         x = self.front_end(x)
