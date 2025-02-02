@@ -138,6 +138,7 @@ def main():
         else:
             model_T = load_model(model_T_config)
         model_S = load_model(model_S_config)
+
         # distiller = CustomDistiller3(
         #     adaptor_T=simple_adaptor2,
         #     adaptor_S=simple_adaptor2,
@@ -196,8 +197,10 @@ def main():
     cfg.config.run.optims = optims_2
     cfg.config.run.output_dir = output_dir_2
     cfg.config.model_S.ckpt = ckpt_path
+
     if not args.dryrun:
         model_S = load_model(model_S_config)
+        
     # print config
     cfg.pretty_print()
 

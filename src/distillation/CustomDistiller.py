@@ -1,12 +1,8 @@
 import sys
+import wandb
 
 from textbrewer import GeneralDistiller
 from textbrewer.distiller_utils import *
-from textbrewer.distiller_basic import BasicDistiller
-
-import torch.distributed as dist
-import torch.nn as nn
-import wandb
 
 sys.path.append('./src/Multi_Level_OT_main')
 from Multi_Level_OT_main.models.distillation_model import DistillationLoss
@@ -37,9 +33,7 @@ class CustomDistiller(GeneralDistiller):
                  use_softmax,
                  use_encoder_embeds=True,
                  dt_normalization_type : Optional[str] = "softmax",
-                 intermediate_normalization_type : Optional[str] = "softmax",
                  kd_type : Optional[str] = "kl_divergence_token_level",
-                 intermediate_control_config='',
                  layer_weight=0.1,
                  padding_value=0,
                  base_alpha=0.2, max_alpha=0.4, ema=0.9
@@ -54,8 +48,6 @@ class CustomDistiller(GeneralDistiller):
         self.kd_type = kd_type
         self.normalization_type = dt_normalization_type
         assert dt_normalization_type in ['','minmax','softmax','standardize'],"normalization_type is not in ['','minmax','softmax','standardize']"
-        self.intermediate_normalization_type =  intermediate_normalization_type
-        assert intermediate_normalization_type in ['','minmax','softmax'],"intermediate_normalization_type is not in ['','minmax','softmax']"
         self.padding_value = padding_value
         self.dynamic_kd_loss = dynamic_kd_loss
         self.dynamic_temperature= dynamic_temperature
@@ -73,25 +65,6 @@ class CustomDistiller(GeneralDistiller):
 
         self.projs = []
         self.projs_group = []
-
-        '''
-        /textbrewer/presets/PROJ_MAP
-
-        PROJ_MAP에 어떠한 projection이 가능한 다양한 레이어를 담아놓고 있음
-        예를 들어 teacher 와 student 간의 Hidden Size가 차이가 나서 이를 차원에 맞게 수정이 필요하여 projection을 위해서 nn.Linear을 사용하면 PROJ_MAP에 저장된 nn.Linear 방식을 사용해서 dim_in, dim_out을 활용해서 이를 선언
-        '''
-        # for im in self.d_config.intermediate_matches:
-        #     if im.proj is not None:
-        #         projection = im.proj[0]
-        #         dim_in = im.proj[1] 
-        #         dim_out = im.proj[2]
-        #         self.projs_group.append(im.proj[3])
-        #         self.projs.append(PROJ_MAP[projection](dim_in, dim_out))
-        #         self.projs[-1].to(self.t_config.device)
-        #     else:
-        #         self.projs.append(None)
-        #         self.projs_group.append(None)`
-
         self.logits_projs=[]
         if  logits_pro is not None:
                 projection = logits_pro[0]
@@ -126,7 +99,6 @@ class CustomDistiller(GeneralDistiller):
             results_T = CustomDict(read_teacher_outputs(T_outputs_path, self.t_config.device))
             teacher_batch = batch_S
             student_batch = batch_S
-
         
         '''
         /textbrewer/distiller_utils/post_adaptor
@@ -271,58 +243,6 @@ class CustomDistiller(GeneralDistiller):
                 # in case of multi-GPU
                 total_hl_loss += loss.mean()
             losses_dict['cross_entropy_output_loss'] = total_hl_loss
-
-        # Feature-Based
-
-        # inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
-        # inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
-        # inputs_mask_T = results_T.get('inputs_mask', None)
-        # inputs_mask_S = results_S.get('inputs_mask', None)
-        # # pdb.set_trace()
-        # for ith, inter_match in enumerate(self.d_config.intermediate_matches):
-        #     layer_T = inter_match.layer_T
-        #     layer_S = inter_match.layer_S
-        #     feature = inter_match.feature
-        #     loss_type = inter_match.loss
-        #     match_weight = inter_match.weight
-        #     match_loss = MATCH_LOSS_MAP[loss_type]
-
-
-        #     if type(layer_S) is list and type(layer_T) is list:
-        #         inter_S = [inters_S[feature][s] for s in layer_S]
-        #         inter_T = [inters_T[feature][t] for t in layer_T]
-        #         name_S = '-'.join(map(str, layer_S))
-        #         name_T = '-'.join(map(str, layer_T))
-        #         if self.projs[ith]:
-        #             # inter_T = [self.projs[ith](t) for t in inter_T]
-        #             # student -> teacher 의 차원으로 projection
-        #             inter_S = [self.projs[ith](s) for s in inter_S]
-        #     else:
-        #         inter_S = inters_S[feature][layer_S]
-        #         inter_T = inters_T[feature][layer_T]
-        #         name_S = str(layer_S)
-        #         name_T = str(layer_T)
-        #         if self.projs[ith]:
-        #             # inter_T = self.projs[ith](inter_T)
-        #             # student -> teacher 의 차원으로 projection
-        #             inter_S = inter_S.float()
-        #             inter_S = self.projs[ith](inter_S)
-
-        #     # normalize
-        #     if len(self.intermediate_normalization_type)>0:
-        #         if self.intermediate_normalization_type=='minmax':
-        #             inter_S = minmax_normalize(inter_S)
-        #             inter_T = minmax_normalize(inter_T)
-        #         elif self.intermediate_normalization_type=='softmax':
-        #             inter_S = softmax_normalize(inter_S)
-        #             inter_T = softmax_normalize(inter_T)
-        #         elif self.intermediate_normalization_type=='standardize':
-        #             inter_S= standardize_tensor(inter_S)
-        #             inter_T= standardize_tensor(inter_T)
-
-        #     intermediate_loss = match_loss(inter_S, inter_T, mask=inputs_mask_S)
-        #     total_loss += intermediate_loss * match_weight
-        #     losses_dict[f'unweighted_{feature}_{loss_type}_{name_S}_{name_T}'] = intermediate_loss
 
         # total_loss =  0.95 * losses_dict['cross_entropy_output_loss'] + 0.05 * losses_dict['logit_based_kd_loss']
         total_loss = (1 - dynamic_alpha) * losses_dict['cross_entropy_output_loss'] + dynamic_alpha * losses_dict['logit_based_kd_loss'] + losses_dict['encoder_embeds_based_kd_loss']
