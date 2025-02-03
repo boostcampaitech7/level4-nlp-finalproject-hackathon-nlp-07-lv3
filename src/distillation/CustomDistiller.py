@@ -338,9 +338,9 @@ class CustomDistiller3:
             layer.to(self.device)
 
         self.KL_divergence_token_level = KL_divergence_token_level
-        self.qformer_distiller = QFormerDistiller(
-                teacher_dim=self.qformer_dim_T, student_dim=self.qformer_dim_S, student_device=self.device
-        )
+        # self.qformer_distiller = QFormerDistiller(
+        #         teacher_dim=self.qformer_dim_T, student_dim=self.qformer_dim_S, student_device=self.device
+        # )
         self.encoder_kd_loss = encoder_kd_loss
 
         self.logger = logging.getLogger(__name__)
@@ -396,7 +396,8 @@ class CustomDistiller3:
                 valid_mask = mask_S * mask_T
                 output_logits_loss += self.KL_divergence_token_level(l_S, l_T, valid_mask)
 
-        qformer_loss = self.qformer_distiller(qformer_output_T, qformer_output_S)
+        # qformer_loss = self.qformer_distiller(qformer_output_T, qformer_output_S)
+        qformer_loss = self.encoder_kd_loss(qformer_output_S, qformer_output_T, student_device=self.device, use_contrasive_loss=False)
         whisper_loss = self.encoder_kd_loss(whisper_output_S, whisper_output_T, student_device=self.device, use_contrasive_loss=False)
         beats_loss = self.encoder_kd_loss(beats_output_S, beats_output_T, student_device=self.device, use_contrasive_loss=False)
 
@@ -411,7 +412,7 @@ class CustomDistiller3:
         losses_dict['beats_loss'] = beats_loss
         losses_dict['output_logits_kl'] = output_logits_loss
 
-        total_loss = (1 - dynamic_alpha) * losses_dict['cross_entropy'] + dynamic_alpha * losses_dict['output_logits_kl'] + 0.8 * losses_dict['qformer'] + 0.8 * losses_dict['whisper_loss'] + 0.8 * losses_dict['beats_loss'] 
+        total_loss = (1 - dynamic_alpha) * losses_dict['cross_entropy'] + dynamic_alpha * losses_dict['output_logits_kl'] + losses_dict['qformer'] + losses_dict['whisper_loss'] + losses_dict['beats_loss'] 
         self.logger.info(losses_dict)
         wandb.log(losses_dict)
         print(losses_dict)
