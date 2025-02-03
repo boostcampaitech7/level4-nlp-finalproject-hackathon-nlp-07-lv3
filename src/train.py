@@ -172,6 +172,14 @@ def main():
     # model_config 재설정: stage-1 ckpt 넘겨받기
     model_config = cfg.config.model
 
+    # ===== Add this after stage1 training =====
+    # 1. Delete stage1 objects
+    del runner_1, model
+    # 2. Clear GPU cache
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    # ===== Continue with stage2 setup =====
+    
     # stage-1 ckpt 대로 model 다시 로드
     if not args.dryrun:
         model = load_model(model_config)
