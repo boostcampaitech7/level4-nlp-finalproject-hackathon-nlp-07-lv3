@@ -21,8 +21,8 @@ import numpy as np
 import pytz
 import torch
 import torch.backends.cudnn as cudnn
-
 import wandb
+
 from config import Config
 from dataset import SALMONNDataset
 from dist_utils import get_rank, init_distributed_mode
@@ -72,17 +72,6 @@ def main():
     # load config
     args = parse_args()
     cfg = Config(args)
-
-    # stage1, stage2 각각의 optim과 output_dir을 따로 담아두고 나중에 넣어줌
-    optims_1 = cfg.config.run.optims.optims_1
-    output_dir_1 = cfg.config.run.output_dir.stage1_output_dir
-    optims_2 = cfg.config.run.optims.optims_2
-    output_dir_2 = cfg.config.run.output_dir.stage2_output_dir
-
-    # stage1 optim 설정으로 바꾸기
-    cfg.config.run.optims = optims_1
-    cfg.config.run.output_dir = output_dir_1
-
     run_config = cfg.config.run
     model_config = cfg.config.model
     data_config = cfg.config.datasets
@@ -114,85 +103,23 @@ def main():
 
     # build stage1 datasets
     # 별도로 valid 지정 없는 경우 train만 생성 후 split
-    if data_config.valid_ann_path_1:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
-            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path),
-        }
-
-    else:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
+    # build datasets
+    datasets = {
+        "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path, data_config.whisper_path),
+        "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path, data_config.whisper_path),
         }
 
     # build model
-    if not args.dryrun:
-        model = load_model(model_config)
-    else:  # load small dummy language model
-        from transformers import AutoModelForCausalLM
-
-        model = AutoModelForCausalLM.from_pretrained("apple/OpenELM-270M-Instruct", trust_remote_code=True)
+    model = load_model(model_config)
 
     # build stage1 runner
-    runner_1 = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
+    runner = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
 
     # stage1 train, return 마지막 ckpt 경로 넘겨 받음
-    ckpt_path = runner_1.train()
+    runner.train()
 
     # stage1 wandb 종료
     wandb.finish()
-
-    # build stage2 datasets
-    # 별도로 valid 지정 없는 경우 train만 생성 후 split
-    if data_config.valid_ann_path_2:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
-            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path),
-        }
-
-    else:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
-        }
-
-    # stage2 optim 설정으로 바꾸기
-    cfg.config.run.optims = optims_2
-    cfg.config.run.output_dir = output_dir_2
-    cfg.config.model.ckpt = ckpt_path
-
-    # print config
-    cfg.pretty_print()
-
-    # Wandb setup, stage2 wandb 시작
-    if wandb_config.log:
-        wandb.init(
-            project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_" + exp_name, config=cfg
-        )
-        
-    # model_config 재설정: stage-1 ckpt 넘겨받기
-    model_config = cfg.config.model
-
-    # ===== Add this after stage1 training =====
-    # 1. Delete stage1 objects
-    del runner_1, model
-    # 2. Clear GPU cache
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    # ===== Continue with stage2 setup =====
-    
-    # stage-1 ckpt 대로 model 다시 로드
-    if not args.dryrun:
-        model = load_model(model_config)
-    else:  # load small dummy language model
-        from transformers import AutoModelForCausalLM
-        model = AutoModelForCausalLM.from_pretrained("apple/OpenELM-270M-Instruct", trust_remote_code=True)
-
-
-    # build stage2 runner
-    runner_2 = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
-
-    # stage2 train
-    runner_2.train()
 
 
 if __name__ == "__main__":
