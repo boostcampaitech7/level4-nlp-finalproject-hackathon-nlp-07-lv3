@@ -111,12 +111,12 @@ def main():
 
     if data_config.valid_ann_path:
         datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
-            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path),
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path, data_config.whisper_path),
+            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path, data_config.whisper_path),
         }
     else:
         datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path, data_config.whisper_path),
         }
 
     # build model
