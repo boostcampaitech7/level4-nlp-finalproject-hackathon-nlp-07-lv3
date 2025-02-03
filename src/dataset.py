@@ -69,9 +69,8 @@ class SALMONNDataset(Dataset):
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        audio_path = self.prefix + "/" + ann["path"]
+        audio_path = self._get_audio_path(ann["path"])
 
-        # 경로 및 오디오 로드 확인
         try:
             audio, sr = sf.read(audio_path)
         except sf.LibsndfileError as e:
@@ -79,12 +78,10 @@ class SALMONNDataset(Dataset):
             logging.error(f"Exception details: {e.args}")
             logging.error(f"Failed to load audio file: {audio_path}")
 
-            try:
-                print(f"Failed to load {audio_path}: {e}. Loading 0-th sample instead.")
-                audio, sr = sf.read(self.prefix + self.annotation[0]["path"])
-            except (IOError, sf.SoundFileError) as e:
-                print(f"Failed to load 0-th sample as well: {e}. Returning empty audio.")
-                audio, sr = np.array([]), 44100  # 빈 오디오와 기본 샘플레이트 반환
+            # 0번째 샘플을 로드 시도
+            audio, sr = self._load_fallback_audio()
+            if audio.size == 0:
+                logging.warning("Returning empty audio due to failure in loading fallback audio.")
 
         if len(audio.shape) == 2:  # stereo to mono
             audio = audio[:, 0]
@@ -112,3 +109,16 @@ class SALMONNDataset(Dataset):
             "Q": Q,
             "id": ann["path"],
         }
+
+    def _get_audio_path(self, path):
+        # 경로를 정규화하여 // 또는 / 문제를 해결
+        return os.path.normpath(os.path.join(self.prefix, path.lstrip('/')))
+
+    def _load_fallback_audio(self):
+        try:
+            fallback_path = self._get_audio_path(self.annotation[0]["path"])
+            print(f"Failed to load original audio. Loading 0-th sample instead: {fallback_path}")
+            return sf.read(fallback_path)
+        except (IOError, sf.SoundFileError) as e:
+            print(f"Failed to load 0-th sample as well: {e}. Returning empty audio.")
+            return np.array([]), 44100  # 빈 오디오와 기본 샘플레이트 반환
