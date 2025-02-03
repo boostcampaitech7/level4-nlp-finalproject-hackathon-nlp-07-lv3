@@ -45,3 +45,6 @@
 ## 분산환경 학습
 - train.yaml 파일에 `use_distributed: True` 체크하고
 `torchrun --nproc_per_node=2 train.py --cfg-path configs/train.yaml `
+
+## CED 설정
+- train.yaml 파일 중 model의 beats_path에 'ced_base' 'ced_small' 'ced_mini' 'ced_tiny' 중 하나를 입력하면 자동으로 zenodo에서 미리 올라간 해당 모델의 가중치를 다운로드하여 로드 합니다.
