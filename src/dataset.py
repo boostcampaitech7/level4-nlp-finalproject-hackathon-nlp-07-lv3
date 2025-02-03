@@ -14,6 +14,7 @@
 
 import json
 
+import logging
 import librosa
 import numpy as np
 import soundfile as sf
@@ -67,7 +68,18 @@ class SALMONNDataset(Dataset):
             audio_path = self.prefix + ann["path"]
         else:
             audio_path = self.prefix + '/' + ann["path"]
-        audio, sr = sf.read(audio_path)
+
+        try:
+            audio, sr = sf.read(audio_path)
+        except sf.LibsndfileError as e:
+            logging.error(f"LibsndfileError: {e}")
+            logging.error(f"Exception details: {e.args}")
+            logging.error(f"Failed to load audio file: {audio_path}")
+
+            # 0번째 샘플을 로드 시도
+            audio, sr = self._load_fallback_audio()
+            if audio.size == 0:
+                logging.warning("Returning empty audio due to failure in loading fallback audio.")
         
         if len(audio.shape) == 2: # stereo to mono
             audio = audio[:, 0]

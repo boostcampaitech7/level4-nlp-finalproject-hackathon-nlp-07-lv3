@@ -1,4 +1,4 @@
-from .CustomDistiller import CustomDistiller, CustomDistiller2 #CustomDistiller3
+from .CustomDistiller import CustomDistiller, CustomDistiller2, CustomDistiller3
 from .utils import (
     softmax_normalize,
     minmax_normalize,

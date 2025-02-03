@@ -24,7 +24,7 @@ from utils import get_dataloader, prepare_sample
 
 
 class DistillRunner:
-    def __init__(self, cfg, model_T, model_S, distiller, datasets, job_id, dryrun, SEED, teacher_output_dir:str="", is_custom_2=False, is_custom_3=False):
+    def __init__(self, cfg, model_T, model_S, distiller, datasets, datasets2, job_id, dryrun, SEED, teacher_output_dir:str="", is_custom_2=False, is_custom_3=False):
         self.seed = SEED
         self.config = cfg
         self.model_config = cfg.config.model_T
@@ -131,6 +131,28 @@ class DistillRunner:
             valid_dataset, self.config.config.run, is_train=False, use_distributed=self.use_distributed
         )
 
+        # datasets["train"]는 SALMONNDataset 인스턴스
+        train_dataset2 = datasets2["train"]
+
+        if "valid" in datasets2:
+            valid_dataset2 = datasets2["valid"]
+        else:
+            train_size2 = int(0.8 * len(train_dataset2))
+            valid_size2 = len(train_dataset2) - train_size2
+
+            train_indices2, valid_indices2 = random_split(
+                range(len(train_dataset2)), [train_size2, valid_size2], generator=torch.Generator().manual_seed(self.seed)
+            )
+
+            valid_dataset2 = copy.deepcopy(train_dataset2)
+            train_dataset2.annotation = [train_dataset2.annotation[i] for i in train_indices2]
+            valid_dataset2.annotation = [valid_dataset2.annotation[i] for i in valid_indices2]
+
+        # 데이터로더 생성
+        self.train_loader2 = get_dataloader(
+            train_dataset2, self.config.config.run, is_train=True, use_distributed=self.use_distributed
+        )
+
         # scaler
         self.use_amp = self.config.config.run.get("amp", False)
         if self.use_amp:
@@ -186,7 +208,7 @@ class DistillRunner:
             
             if self.model_T is not None:
                 samples_S = next(self.train_loader)
-                samples_T = copy.deepcopy(samples_S)
+                samples_T = next(self.train_loader2)
                 samples_S = prepare_sample(samples_S, cuda_enabled=self.cuda_enabled, device=self.device)
                 samples_T = prepare_sample(samples_T, cuda_enabled=self.cuda_enabled, device=self.device2)
             else:
@@ -200,13 +222,13 @@ class DistillRunner:
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     if self.model_T is not None:
                         if self.is_custom_2:
-                            output_T, encoder_output_T, targets_T = self.model_T(samples_T)
-                            output_S, encoder_output_S, targets_S = self.model_S(samples_S)
+                            output_T, encoder_output_T, targets_T, _, _ = self.model_T(samples_T)
+                            output_S, encoder_output_S, targets_S, _, _ = self.model_S(samples_S)
                             loss = self.distiller.train_on_batch(epoch, output_T, output_S, targets_T, targets_S, encoder_output_T, encoder_output_S, device=self.device)
                         elif self.is_custom_3:
-                            output_T, encoder_output_T, _ = self.model_T(samples_T)
-                            output_S, encoder_output_S, _ = self.model_S(samples_S)
-                            loss = self.distiller.train_on_batch(epoch, output_T, output_S, encoder_output_T, encoder_output_S, device=self.device)
+                            output_T, encoder_output_T, _, whisper_output_T, beats_output_T = self.model_T(samples_T)
+                            output_S, encoder_output_S, _, whisper_output_S, beats_output_S = self.model_S(samples_S)
+                            loss = self.distiller.train_on_batch(epoch, output_T, output_S, encoder_output_T, encoder_output_S, whisper_output_T, whisper_output_S, beats_output_T, beats_output_S, device=self.device)
                         else:
                             loss, _ = self.distiller.train_on_batch(samples_S, samples_T)
                     else:

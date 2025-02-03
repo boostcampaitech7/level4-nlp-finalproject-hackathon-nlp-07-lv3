@@ -255,6 +255,9 @@ class SALMONN(nn.Module):
                     elif audio_embeds.size(1) > speech_embeds.size(1):
                         speech_embeds = F.pad(speech_embeds, (0, 0, 0, audio_embeds.size(1) - speech_embeds.size(1)))
                     # speech encoder + non-speech encoder 결과를 concat 해서 Z 값
+                    if self.distillation:
+                        whisper_embeds = speech_embeds
+                        beats_embeds = audio_embeds
                     speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
                 speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
 
@@ -295,7 +298,7 @@ class SALMONN(nn.Module):
                 raise NotImplementedError
 
         if self.distillation:
-            return speech_embeds, speech_atts, query_output
+            return speech_embeds, speech_atts, query_output, whisper_embeds, beats_embeds
         else:
             return speech_embeds, speech_atts
 
@@ -401,7 +404,7 @@ class SALMONN(nn.Module):
         # LLM에 input으로 들어가기 위한 값들
         # spectrogram 이 Whisper , raw_wav 가 BEATs
         if self.distillation:
-            speech_embeds, speech_atts, query_output = self.encode_speech(
+            speech_embeds, speech_atts, query_output, whiser_embeds, beats_embeds = self.encode_speech(
                 spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask
             )
             encoder_embeds = query_output
@@ -482,7 +485,7 @@ class SALMONN(nn.Module):
             loss = outputs.loss
 
         if self.distillation:
-            return outputs, encoder_embeds, targets
+            return outputs, encoder_embeds, targets, whiser_embeds, beats_embeds
 
         if verbose:
             nvocab = self.llama_model.config.vocab_size

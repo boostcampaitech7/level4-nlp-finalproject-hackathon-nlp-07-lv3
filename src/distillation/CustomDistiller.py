@@ -16,7 +16,7 @@ from distillation.utils import (
                                 custom_post_adaptor,
                                 CustomDict
                             )
-from distillation.losses import dynamic_kd_loss, encoder_kd_loss, KL_divergence, KL_divergence_token_level, DifficultyAwareDistiller, MultiGranularFeatureAlignment
+from distillation.losses import dynamic_kd_loss, encoder_kd_loss, KL_divergence, KL_divergence_token_level, QFormerDistiller
 from utils import move_to_cuda
 
 class CustomDistiller(GeneralDistiller):
@@ -90,12 +90,12 @@ class CustomDistiller(GeneralDistiller):
         args = args or {}
 
         if self.model_T is not None:
-            results_T, encoder_embeds_T, _ = self.model_T(batch_T)
-            results_S, encoder_embeds_S, _ = self.model_S(batch_S)
+            results_T, encoder_embeds_T, _, _, _ = self.model_T(batch_T)
+            results_S, encoder_embeds_S, _, _, _ = self.model_S(batch_S)
             teacher_batch = batch_T
             student_batch = batch_S
         else:
-            results_S = self.model_S(batch_S)
+            results_S, _, _, _, _ = self.model_S(batch_S)
             results_T = CustomDict(read_teacher_outputs(T_outputs_path, self.t_config.device))
             teacher_batch = batch_S
             student_batch = batch_S
@@ -237,10 +237,9 @@ class CustomDistiller(GeneralDistiller):
             losses_dict['encoder_embeds_based_kd_loss'] = total_enkd_loss
 
         # Cross-Entropy Loss
-        if 'losses' in results_S:
+        if 'loss' in results_S:
             total_hl_loss = 0
-            for loss in results_S['losses']:
-                # in case of multi-GPU
+            for loss in results_S['loss']:
                 total_hl_loss += loss.mean()
             losses_dict['cross_entropy_output_loss'] = total_hl_loss
 
@@ -316,26 +315,19 @@ class CustomDistiller2:
     
 class CustomDistiller3:
 
-    def __init__(self, adaptor_T, adaptor_S, encoder_dim, decoder_dim, base_alpha=0.2, max_alpha=0.4, ema=0.9, mgfa_weight=1, encoder_loss_weight=0.5, use_encoder_output=True, device='cuda'):
-        self.use_encoder_output = use_encoder_output
+    def __init__(self, adaptor_T, adaptor_S, qformer_dim_T, qformer_dim_S, device='cuda'):
         self.adaptor_T = adaptor_T
         self.adaptor_S = adaptor_S
+        self.qformer_dim_T = qformer_dim_T
+        self.qformer_dim_S = qformer_dim_S
         self.device = device
 
-        # self.mgfa = MultiGranularFeatureAlignment(
-        #         audio_dim=encoder_dim,
-        #         text_dim=decoder_dim,
-        #         device=self.device
-        #     )
-        self.ddat =  DifficultyAwareDistiller(
-                base_alpha=base_alpha,
-                max_alpha=max_alpha,
-                ema=ema
-            )
-        self.mgfa_weight = mgfa_weight
-        if use_encoder_output:
-            self.encoder_kd_loss = encoder_kd_loss
-            self.encoder_loss_weight = encoder_loss_weight
+
+        self.qformer_distiller = QFormerDistiller(
+                teacher_dim=self.qformer_dim_T, student_dim=self.qformer_dim_S, student_device=self.device
+        )
+        self.encoder_kd_loss = encoder_kd_loss
+        
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -346,35 +338,70 @@ class CustomDistiller3:
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-    def train_on_batch(self, epoch, output_T, output_S, encoder_output_T=None, encoder_output_S=None, device="cuda"):
+    def train_on_batch(self, epoch, output_T, output_S, qformer_output_T, qformer_output_S, whisper_output_T, whisper_output_S, beats_output_T, beats_output_S, device="cuda"):
         losses_dict={}
-        output_T, output_S = CustomDict(move_to_cuda(self.adaptor_T(output_T), device)), CustomDict(move_to_cuda(self.adaptor_S(output_S), device))
-        encoder_output_S, encoder_output_T = encoder_output_S.last_hidden_state.to(device), encoder_output_T.last_hidden_state.to(device)
-        # loss_mgfa = self.mgfa(
-        #     audio_feats=encoder_output_S,  
-        #     text_feats=output_S.last_hidden_state
-        # )
-        total_loss, distill_loss, ce_loss, alpha_val = self.ddat.calc_distillation_loss(
-            teacher_output=output_T,
-            student_output=output_S,
-        )
+        output_T, output_S = custom_post_adaptor(self.adaptor_T(output_T)), custom_post_adaptor(self.adaptor_S(output_S))
+        qformer_output_S, qformer_output_T = qformer_output_S.last_hidden_state.to(device), qformer_output_T.last_hidden_state.to(device)
+        whisper_output_S, whisper_output_T = whisper_output_S.last_hidden_state.to(device), whisper_output_T.last_hidden_state.to(device)
+        beats_output_S, beats_output_T = beats_output_S.last_hidden_state.to(device), beats_output_T.last_hidden_state.to(device)
 
-        # total_loss_all = total_loss + self.mgfa_weight * loss_mgfa
-        total_loss_all = total_loss
-        if self.use_encoder_output:
-            encoder_loss = self.encoder_kd_loss(encoder_output_S, encoder_output_T)
-            total_loss_all += self.encoder_loss_weight * encoder_loss
- 
-        losses_dict['crossentropy'] = ce_loss
-        # losses_dict['mgfa'] = loss_mgfa
-        losses_dict['ddat'] = distill_loss
-        losses_dict['dynamic_alpha'] = alpha_val
-        if self.use_encoder_output:
-            losses_dict['encoder_loss'] = encoder_loss
+        total_loss = 0
+
+        if 'logits' in output_T and 'logits' in output_S:
+            logits_list_T = output_T['logits']  # list of tensor
+            logits_list_S = output_S['logits']  # list of tensor
+
+            output_logits_loss = 0
+
+            # (1) 교사 모델의 엔트로피 계산
+            teacher_probs = torch.softmax(logits_list_T[0], dim=-1)
+            teacher_ent   = -torch.sum(teacher_probs * torch.log(teacher_probs + 1e-9), dim=-1)
+            batch_ent     = teacher_ent.mean()
+            batch_ent_detached = batch_ent.detach()
+
+            # (2) EMA(지수 가중 이동평균)로 난이도 추적
+            if self.prev_entropy is None:
+                self.prev_entropy = batch_ent_detached
+            else:
+                self.prev_entropy = self.ema * self.prev_entropy + (1 - self.ema) * batch_ent_detached
+
+            # (3) 난이도에 따른 alpha 조정
+            #     예: 난이도가 높을수록 alpha가 커진다
+            dynamic_alpha = self.base_alpha + torch.sigmoid(self.prev_entropy - 2.0) * (self.max_alpha - self.base_alpha)
+            dynamic_alpha = dynamic_alpha.to(device).item()
+
+            for l_T, l_S in zip(logits_list_T, logits_list_S):
+                l_T, l_S = l_T.to(device), l_S.to(device)
+
+                for logits_layer in self.logits_projs:
+                    l_S = logits_layer(l_S)
+
+                l_S, l_T = pad_logits(l_S, l_T, self.padding_value)
+                mask_S = (l_S != self.padding_value).any(dim=-1).float()
+                mask_T = (l_T != self.padding_value).any(dim=-1).float()
+                valid_mask = mask_S * mask_T
+                output_logits_loss += self.KL_divergence_token_level(l_S, l_T, valid_mask)
+
+        qformer_loss = self.qformer_distiller(qformer_output_T, qformer_output_S)
+        whisper_loss = self.encoder_kd_loss(whisper_output_S, whisper_output_T, student_device=self.device, use_contrasive_loss=False)
+        beats_loss = self.encoder_kd_loss(beats_output_S, beats_output_T, student_device=self.device, use_contrasive_loss=False)
+
+        if 'loss' in output_S:
+            ce_loss = 0
+            for loss in output_S['loss']:
+                ce_loss += loss.mean()
+
+        losses_dict['cross_entropy'] = ce_loss
+        losses_dict['qformer'] = qformer_loss
+        losses_dict['whisper_loss'] = whisper_loss
+        losses_dict['beats_loss'] = beats_loss
+        losses_dict['output_logits_kl'] = output_logits_loss
+
+        total_loss = (1 - dynamic_alpha) * losses_dict['cross_entropy'] + dynamic_alpha * losses_dict['output_logits_kl'] + 0.8 * losses_dict['qformer'] + 0.8 * losses_dict['whisper_loss'] + 0.8 * losses_dict['beats_loss'] 
         self.logger.info(losses_dict)
         wandb.log(losses_dict)
         print(losses_dict)
-        return total_loss_all
+        return total_loss
 
          
     

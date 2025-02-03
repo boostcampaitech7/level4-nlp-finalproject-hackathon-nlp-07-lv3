@@ -53,7 +53,7 @@ def KL_divergence(logits_S, logits_T, mask_S, mask_T, scaling_temperatures=1, pa
     loss = F.kl_div(student_log_probs, teacher_probs, reduction="batchmean") * (scaling_temperatures ** 2)
     return loss
 
-def encoder_kd_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature=1, student_device='cuda'):
+def encoder_kd_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature=1, student_device='cuda', use_contrasive_loss=True):
     '''
     reference:
         Efficient Audio Captioning with Encoder-Level Knowledge Distillation 
@@ -72,7 +72,7 @@ def encoder_kd_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature=1, st
     elif emd_s_size < emd_t_size:
         encoder_embeds_S = projection_layer(encoder_embeds_S)
 
-    if encoder_embeds_S.size(0) == 1:
+    if encoder_embeds_S.size(0) == 1 or use_contrasive_loss == False:
         loss = F.mse_loss(encoder_embeds_S / scaling_temerature, encoder_embeds_T)
     else:
         loss = contrastive_loss(encoder_embeds_S, encoder_embeds_T, scaling_temerature)
@@ -99,3 +99,18 @@ def contrastive_loss(encoder_embeds_S, encoder_embeds_T, scaling_temperature=1):
 
     return L_contra
 
+class QFormerDistiller(nn.Module):
+    def __init__(self, teacher_dim=768, student_dim=512, student_device='cuda'):
+        super().__init__()
+        self.proj = nn.Linear(student_dim, teacher_dim).to(student_device)
+        self.temperature = nn.Parameter(torch.tensor(1.0))
+        
+    def forward(self, teacher_queries, student_queries):
+        student_queries = self.proj(student_queries)
+        
+        teacher_norm = F.normalize(teacher_queries, p=2, dim=-1)
+        student_norm = F.normalize(student_queries, p=2, dim=-1)
+        
+        sim_matrix = torch.einsum('btd,bsd->bts', teacher_norm, student_norm)
+        loss = -torch.log(torch.softmax(sim_matrix / self.temperature, dim=-1))
+        return loss.mean()

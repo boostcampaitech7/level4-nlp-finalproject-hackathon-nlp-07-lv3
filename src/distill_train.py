@@ -30,7 +30,7 @@ from models import load_model
 from textbrewer import TrainingConfig, DistillationConfig
 from utils import setup_logger
 from distill_runner import DistillRunner
-from distillation import CustomDistiller, CustomDistiller2 # CustomDistiller3
+from distillation import CustomDistiller, CustomDistiller2, CustomDistiller3
 
 def now():
     seoul_tz = pytz.timezone("Asia/Seoul")
@@ -118,15 +118,23 @@ def main():
             "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
             "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path),
         }
+        datasets2 = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path2),
+            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_1, data_config.whisper_path2),
+        }
 
     else:
         datasets = {
             "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path),
         }
+        datasets2 = {
+            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_1, data_config.whisper_path2),
+        }
+
 
 
     def simple_adaptor(model_outputs, batch=None):
-        return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'losses': model_outputs.loss}
+        return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'loss': model_outputs.loss}
 
     def simple_adaptor2(model_outputs, batch=None):
         return {'logits': model_outputs.logits, 'hidden': model_outputs.hidden_states, 'loss': model_outputs.loss, 'last_hidden_state': model_outputs.hidden_states[-1]}
@@ -139,82 +147,88 @@ def main():
             model_T = load_model(model_T_config)
         model_S = load_model(model_S_config)
 
-        # distiller = CustomDistiller3(
-        #     adaptor_T=simple_adaptor2,
-        #     adaptor_S=simple_adaptor2,
-        #     encoder_dim=model_S.speech_Qformer.config.hidden_size,
-        #     decoder_dim=model_S.llama_model.config.hidden_size,
-        #     device=run_config.device
-        # )
+        distiller = CustomDistiller3(
+            adaptor_T=simple_adaptor2,
+            adaptor_S=simple_adaptor2,
+            qformer_dim_T=model_T.speech_Qformer.config.hidden_size,
+            qformer_dim_S=model_S.speech_Qformer.config.hidden_size,
+            device=run_config.device
+        )
 
         # distiller = CustomDistiller2(
         #     adaptor_T=simple_adaptor2,
         #     adaptor_S=simple_adaptor2
         # )
 
-        distiller = CustomDistiller(
-                        train_config=TrainingConfig(
-                            device=run_config.device
-                        ),
-                        distill_config=DistillationConfig(),
-                        model_T=model_T,
-                        model_S=model_S,
-                        adaptor_T=simple_adaptor,
-                        adaptor_S=simple_adaptor,
-                        logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
-                        global_step_start=0,
-                        use_softmax=True,
-                        dt_normalization_type='softmax',
-                    )
+        # distiller = CustomDistiller(
+        #                 train_config=TrainingConfig(
+        #                     device=run_config.device
+        #                 ),
+        #                 distill_config=DistillationConfig(),
+        #                 model_T=model_T,
+        #                 model_S=model_S,
+        #                 adaptor_T=simple_adaptor,
+        #                 adaptor_S=simple_adaptor,
+        #                 logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
+        #                 global_step_start=0,
+        #                 use_softmax=True,
+        #                 dt_normalization_type='softmax',
+        #             )
 
     else:  # load small dummy language model
         return
 
     # build stage1 runner
-    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
+    runner_1 = DistillRunner(cfg, model_T, model_S, distiller, datasets, datasets2, job_id, args.dryrun, SEED, is_custom_3=True)
 
     # stage1 train, return 마지막 ckpt 경로 넘겨 받음
     ckpt_path = runner_1.train()
-    torch.cuda.empty_cache()
 
     # stage1 wandb 종료
     wandb.finish()
 
-    # build stage2 datasets
-    # 별도로 valid 지정 없는 경우 train만 생성 후 split
-    if data_config.valid_ann_path_2:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
-            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path),
-        }
+    # # build stage2 datasets
+    # # 별도로 valid 지정 없는 경우 train만 생성 후 split
+    # if data_config.valid_ann_path_2:
+    #     datasets = {
+    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
+    #         "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path),
+    #     }
+    #     datasets2 = {
+    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path2),
+    #         "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path_2, data_config.whisper_path2),
+    #     }
 
-    else:
-        datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
-        }
+    # else:
+    #     datasets = {
+    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path),
+    #     }
+    #     datasets2 = {
+    #         "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path_2, data_config.whisper_path2),
+    #     }
 
-    # stage2 optim 설정으로 바꾸기
-    cfg.config.run.optims = optims_2
-    cfg.config.run.output_dir = output_dir_2
-    cfg.config.model_S.ckpt = ckpt_path
+    # # stage2 optim 설정으로 바꾸기
+    # cfg.config.run.optims = optims_2
+    # cfg.config.run.output_dir = output_dir_2
+    # cfg.config.model_S.ckpt = ckpt_path
 
-    if not args.dryrun:
-        model_S = load_model(model_S_config)
+    # if not args.dryrun:
+    #     model_S = load_model(model_S_config)
 
-    # print config
-    cfg.pretty_print()
+    # # print config
+    # cfg.pretty_print()
 
-    # Wandb setup, stage2 wandb 시작
-    if wandb_config.log:
-        wandb.init(
-            project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_", config=cfg
-        )
+    # # Wandb setup, stage2 wandb 시작
+    # if wandb_config.log:
+    #     wandb.init(
+    #         project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_AAC_", config=cfg
+    #     )
 
-    # build stage2 runner
-    runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, job_id, args.dryrun, SEED)
+    # # build stage2 runner
+    # runner_2 = DistillRunner(cfg, model_T, model_S, distiller, datasets, datasets2, job_id, args.dryrun, SEED)
 
-    # stage2 train
-    runner_2.train()
+    # # stage2 train
+    # runner_2.train()
 
 if __name__ == "__main__":
     main()
