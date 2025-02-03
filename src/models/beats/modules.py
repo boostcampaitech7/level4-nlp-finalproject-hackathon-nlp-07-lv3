@@ -19,7 +19,7 @@ class GradMultiply(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, scale):
         ctx.scale = scale
-        res = x.new(x)
+        res = x.new(x) # x.clone()
         return res
 
     @staticmethod

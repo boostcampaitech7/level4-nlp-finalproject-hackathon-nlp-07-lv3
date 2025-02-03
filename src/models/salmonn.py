@@ -27,6 +27,8 @@ from .beats.BEATs import BEATs, BEATsConfig
 from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub
+from .modeling_ced import *
+from . import modeling_ced
 
 
 class SALMONN(nn.Module):
@@ -154,24 +156,18 @@ class SALMONN(nn.Module):
 
         if self.beats_path:
             logging.info("Loading BEATs Model")
-            beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
-            beats_cfg = BEATsConfig(beats_ckpt["cfg"])
-            # non-speech model
-            self.beats = BEATs(beats_cfg)
-            self.beats.load_state_dict(beats_ckpt["model"])
-            # non-speech
-            self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
+            self.beats = getattr(modeling_ced, self.beats_path)(pretrained=True)
+            self.ln_audio = nn.LayerNorm(self.beats.embed_dim)
             if freeze_beats:
                 for name, param in self.beats.named_parameters():
                     param.requires_grad = False
                 self.beats.eval()
                 logging.info("freeze BEATs")
-
         if self.use_speech_Qformer:
             if self.beats_path:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
                     num_query_token=num_speech_query_token,
-                    speech_width=self.speech_encoder.config.d_model + self.beats.cfg.encoder_embed_dim,
+                    speech_width=self.speech_encoder.config.d_model + self.beats.embed_dim
                 )
             else:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
@@ -300,9 +296,7 @@ class SALMONN(nn.Module):
             speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
             # non-speech
             if self.beats_path and raw_wav is not None:
-                audio_embeds, _ = self.beats.extract_features(
-                    raw_wav, padding_mask=audio_padding_mask, feature_only=True
-                )
+                audio_embeds = self.beats.forward(raw_wav)
             else:
                 audio_embeds = None
 

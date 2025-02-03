@@ -160,7 +160,7 @@ class Runner:
                 break
 
             samples = next(self.train_loader)
-            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
+            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled, device=self.config.config.run.device)
 
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
@@ -220,7 +220,7 @@ class Runner:
 
         results = []
         for samples in metric_logger.log_every(dataloader, self.config.config.run.log_freq, header=header):
-            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
+            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled, device=self.config.config.run.device)
 
             if not self.dryrun:
                 with torch.cuda.amp.autocast(enabled=self.use_amp):

@@ -122,7 +122,7 @@ class BEATs(nn.Module):
         fbanks = []
         for waveform in source:
             waveform = waveform.unsqueeze(0) * 2**15
-            fbank = ta_kaldi.fbank(waveform, num_mel_bins=128, sample_frequency=16000, frame_length=25, frame_shift=10)
+            fbank = ta_kaldi.fbank(waveform, num_mel_bins=128, sample_frequency=16000, frame_length=25, frame_shift=10) # torchaudio.compliance.kaldi as ta_kaldi
             fbanks.append(fbank)
         fbank = torch.stack(fbanks, dim=0)
         fbank = (fbank - fbank_mean) / (2 * fbank_std)
@@ -142,6 +142,7 @@ class BEATs(nn.Module):
             padding_mask = self.forward_padding_mask(fbank, padding_mask)
 
         fbank = fbank.unsqueeze(1)
+        # embedd_dim 으로 output
         features = self.patch_embedding(fbank)
         features = features.reshape(features.shape[0], features.shape[1], -1)
         features = features.transpose(1, 2)
@@ -151,10 +152,12 @@ class BEATs(nn.Module):
             padding_mask = self.forward_padding_mask(features, padding_mask)
 
         if self.post_extract_proj is not None:
+            # .encoder_embed_dim으로 proj (SED와 동일하게 기본으로 768로 설정)
             features = self.post_extract_proj(features)
 
         x = self.dropout_input(features)
 
+        # x_dim = encoder_embed_dim
         x, layer_results = self.encoder(
             x,
             padding_mask=padding_mask,
@@ -175,4 +178,4 @@ class BEATs(nn.Module):
 
             return lprobs, padding_mask
         else:
-            return x, padding_mask
+            return x, padding_mask # x_dim = encoder_embed_dim

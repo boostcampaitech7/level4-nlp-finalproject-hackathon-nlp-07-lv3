@@ -15,6 +15,8 @@ logs/
 *.pt
 *.pth
 *.ckpt
+*.csv
+submission_results/
 
 # 데이터셋(대용량 이므로 불포함)
 data/
@@ -36,3 +38,9 @@ Thumbs.db
 # 개인 설정값 무시
 *.yaml
 *.yml
+
+src/lm_evaluation_harness/*
+src/LLMPruner/*
+
+src/Multi_Level_OT_main
+src/Multi-Level-OT-main

@@ -8,7 +8,7 @@ wandb:
 
 model:
   # paths
-  llama_path: "unsloth/Llama-3.2-1B-Instruct-bnb-4bit"
+  llama_path: "meta/Llama-3.2-1B-Instruct"
   whisper_path: "openai/whisper-large-v3"
   beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로
 
@@ -69,7 +69,7 @@ run:
   batch_size_eval: 4     # 원래 8
   num_workers: 0     # 원래 8
 
-  device: "cuda:1"
+  device: "cuda"
   use_distributed: True # 원래 True(분산 환경에서는 True 맞음)
   amp: True
   world_size: 2          # 원래 2

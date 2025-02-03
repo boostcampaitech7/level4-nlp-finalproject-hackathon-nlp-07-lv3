@@ -91,6 +91,7 @@ def main():
     SEED = setup_seeds(run_config)
     setup_logger()  # set after init_distributed_mode() to only log on master.
 
+
     if run_config.use_distributed:  # 분산 모드 여부 확인
         global_rank = int(os.environ["RANK"])
     else:
@@ -101,6 +102,9 @@ def main():
     # print config
     cfg.pretty_print()
 
+    device = torch.device(cfg.config.run.device)
+    torch.cuda.set_device(device.index)
+    
     # build stage1 datasets
     # 별도로 valid 지정 없는 경우 train만 생성 후 split
     # build datasets
