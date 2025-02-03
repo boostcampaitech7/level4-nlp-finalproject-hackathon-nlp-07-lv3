@@ -152,7 +152,8 @@ def main():
             adaptor_S=simple_adaptor2,
             qformer_dim_T=model_T.speech_Qformer.config.hidden_size,
             qformer_dim_S=model_S.speech_Qformer.config.hidden_size,
-            device=run_config.device
+            logits_pro=['linear', model_S.llama_model.get_input_embeddings().num_embeddings, model_T.llama_model.get_input_embeddings().num_embeddings],
+            student_device=run_config.device
         )
 
         # distiller = CustomDistiller2(

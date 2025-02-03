@@ -62,9 +62,6 @@ class CustomDistiller(GeneralDistiller):
         self.ema = ema
         self.prev_entropy = None
         
-
-        self.projs = []
-        self.projs_group = []
         self.logits_projs=[]
         if  logits_pro is not None:
                 projection = logits_pro[0]
@@ -315,19 +312,36 @@ class CustomDistiller2:
     
 class CustomDistiller3:
 
-    def __init__(self, adaptor_T, adaptor_S, qformer_dim_T, qformer_dim_S, device='cuda'):
+    def __init__(self, adaptor_T, adaptor_S, qformer_dim_T, qformer_dim_S, logits_pro, base_alpha=0.2, max_alpha=0.4, ema=0.9,  padding_value=0, student_device='cuda'):
         self.adaptor_T = adaptor_T
         self.adaptor_S = adaptor_S
         self.qformer_dim_T = qformer_dim_T
         self.qformer_dim_S = qformer_dim_S
-        self.device = device
+        self.device = student_device
 
+        self.padding_value = padding_value
+        self.ema = ema
+        self.base_alpha = base_alpha
+        self.max_alpha = max_alpha
+        self.prev_entropy = None
+        
+        self.logits_projs=[]
+        if  logits_pro is not None:
+                projection = logits_pro[0]
+                dim_in = logits_pro[1]
+                dim_out = logits_pro[2]
+                self.logits_projs.append(PROJ_MAP[projection](dim_in, 4096))
+                self.logits_projs.append(PROJ_MAP[projection](4096, dim_out))
+        else: 
+            raise ValueError("logits_pro is None. Please provide a valid projection configuration.")
+        for layer in self.logits_projs:
+            layer.to(self.device)
 
+        self.KL_divergence_token_level = KL_divergence_token_level
         self.qformer_distiller = QFormerDistiller(
                 teacher_dim=self.qformer_dim_T, student_dim=self.qformer_dim_S, student_device=self.device
         )
         self.encoder_kd_loss = encoder_kd_loss
-        
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -342,8 +356,8 @@ class CustomDistiller3:
         losses_dict={}
         output_T, output_S = custom_post_adaptor(self.adaptor_T(output_T)), custom_post_adaptor(self.adaptor_S(output_S))
         qformer_output_S, qformer_output_T = qformer_output_S.last_hidden_state.to(device), qformer_output_T.last_hidden_state.to(device)
-        whisper_output_S, whisper_output_T = whisper_output_S.last_hidden_state.to(device), whisper_output_T.last_hidden_state.to(device)
-        beats_output_S, beats_output_T = beats_output_S.last_hidden_state.to(device), beats_output_T.last_hidden_state.to(device)
+        whisper_output_S, whisper_output_T = whisper_output_S.to(device), whisper_output_T.to(device)
+        beats_output_S, beats_output_T = beats_output_S.to(device), beats_output_T.to(device)
 
         total_loss = 0
 

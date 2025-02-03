@@ -80,10 +80,10 @@ def custom_post_adaptor(dict_object):
         logits_mask = dict_object['logits_mask']
         if not isinstance(logits_mask,(list,tuple)):
             dict_object['logits_mask'] = [ logits_mask ]
-    if 'losses' in dict_object:
-        losses = dict_object['losses']
-        if not isinstance(losses,(list,tuple)):
-            dict_object['losses'] = [ losses ]
+    if 'loss' in dict_object:
+        loss = dict_object['loss']
+        if not isinstance(loss,(list,tuple)):
+            dict_object['loss'] = [ loss ]
     if 'labels' in dict_object:
         labels = dict_object['labels']
         if not isinstance(labels,(list,tuple)):
