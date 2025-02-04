@@ -46,7 +46,7 @@ class Runner:
         self.start_epoch = 0
         self.max_epoch = self.config.config.run.optims.max_epoch
         self.evaluate_only = self.config.config.run.evaluate
-        self.cuda_enabled = self.device.type == "cuda:1"
+        self.cuda_enabled = True
 
         # test prompt
         self.prompt_template = self.config.config.model.get("prompt_template", "")
@@ -95,7 +95,8 @@ class Runner:
         else:
             train_dataset = datasets["train"]
 
-            train_size = int(0.95 * len(train_dataset))
+            train_size = int(0.99 * len(train_dataset))
+            #train_size = int(0.999 * len(train_dataset))
             valid_size = len(train_dataset) - train_size
 
             train_indices, valid_indices = random_split(
@@ -190,8 +191,13 @@ class Runner:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
-                    profile_flag = True if i == 0 and profile_flag else False
-                    loss = self.model(samples, n_samples, profile_flag=profile_flag)["loss"]
+                    try:
+                        loss = self.model(samples, n_samples, profile_flag=False)["loss"]
+                    except Exception as e:
+                        print(f"error occurred on train_epoch : {e}")
+                        metric_logger.synchronize_between_processes()
+                        logging.info("Averaged stats: " + str(metric_logger.global_avg()))
+                        return {k: "{:.3f}".format(meter.global_avg) for k, meter in metric_logger.meters.items()}
 
                 if self.use_amp:
                     self.scaler.scale(loss).backward()
@@ -371,27 +377,22 @@ class Runner:
             self.log_stats(train_stats, split_name="train")
 
             # validating phase
-            logging.info("Validating Phase")
+            # logging.info("Validating Phase")
 
-            # Test how much iteration self.n_loader_train has
-            for elem in self.n_loader_valid._get_iterator():
-                temp = elem
-                print(temp.audio.shape)
+            # valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
+            # if valid_log is not None:
+                # if is_main_process():
+                #     agg_metrics = valid_log["agg_metrics"]
+                #     if agg_metrics > best_agg_metric:
+                #         best_agg_metric = agg_metrics
+                #         best_epoch = cur_epoch
 
-            valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
-            if valid_log is not None:
-                if is_main_process():
-                    agg_metrics = valid_log["agg_metrics"]
-                    if agg_metrics > best_agg_metric:
-                        best_agg_metric = agg_metrics
-                        best_epoch = cur_epoch
+                #         # 평가 메트릭을 통해서 Best 모델인 경우 저장
+                #         best_save_directory = self.save_checkpoint(cur_epoch, is_best=True)
 
-                        # 평가 메트릭을 통해서 Best 모델인 경우 저장
-                        best_save_directory = self.save_checkpoint(cur_epoch, is_best=True)
-
-                    valid_log.update({"best_epoch": best_epoch})
-                    self.log_stats(valid_log, split_name="valid")
-                    wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
+                #     valid_log.update({"best_epoch": best_epoch})
+                #     self.log_stats(valid_log, split_name="valid")
+                #     wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
 
             if self.use_distributed:
                 dist.barrier()
@@ -399,10 +400,10 @@ class Runner:
         # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
         last_save_directory = self.save_checkpoint(cur_epoch, is_best=False)
 
-        if self.evaluate_only:
-            test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
-            if test_log is not None:
-                self.log_stats(test_log, split_name="test")
+        # if self.evaluate_only:
+        #     test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
+        #     if test_log is not None:
+        #         self.log_stats(test_log, split_name="test")
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))

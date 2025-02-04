@@ -17,9 +17,6 @@ from dataclasses import fields, is_dataclass
 import json
 import logging
 import random
-import os
-import random
-import time
 from typing import Any, Union
 
 import torch
@@ -29,10 +26,8 @@ from peft import LoraConfig, TaskType, get_peft_model
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
 
 from .beats.BEATs import BEATs, BEATsConfig
-from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub
-from torch.profiler import profile, ProfilerActivity
 from nemo.collections.asr.models import EncDecMultiTaskModel
 
 class SALMONN(nn.Module):
@@ -301,7 +296,12 @@ class SALMONN(nn.Module):
                         speech_embeds = F.pad(speech_embeds, (0, 0, 0, audio_embeds.size(1) - speech_embeds.size(1)))
 
                     # speech encoder + non-speech encoder 결과를 concat 해서 Z 값
-                    speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
+                    try:
+                        speech_embeds = torch.cat((speech_embeds, audio_embeds), dim=-1)
+
+                    except Exception as e:
+                        print(f"shape mismatch : speech_embeds -> {speech_embeds.shape} != audio_embeds -> {audio_embeds.shape}")
+
                 speech_atts = torch.ones(speech_embeds.size()[:-1], dtype=torch.long).to(speech_embeds.device)
 
                 # 인코더 결과값들은 고정된 값이 아니라 valiable 한 값이기에 QFormer는 태생적으로 고정된 값들 만을 처리할 수 있다.
@@ -310,8 +310,8 @@ class SALMONN(nn.Module):
                     B, T, C = speech_embeds.shape
                     kernel = round(T * self.second_per_window / 30.0)
                     stride = round(T * self.second_stride / 30.0)
-                    kernel = (1, kernel)
-                    stride = (1, stride)
+                    kernel = (1, max(kernel, 1))
+                    stride = (1, max(stride, 1))
                     speech_embeds_tr = speech_embeds.transpose(1, 2).unsqueeze(2)
 
                     # 입력 텐서에 슬라이딩 윈도우를 적용해서 커널이 지나간 요소들을 Flatten 해서 하나의 벡터로 변환 후 최종적으로 2D tensor로 반환
@@ -347,17 +347,17 @@ class SALMONN(nn.Module):
         with self.maybe_autocast():
             input_signal, input_signal_length, = n_samples.audio, n_samples.audio_lens
 
-            processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
-                input_signal=input_signal, length=input_signal_length
-            )
+            try:
+                processed_signal, processed_signal_length = self.speech_encoder.preprocessor(
+                    input_signal=input_signal, length=input_signal_length
+                )
 
-            encoded, encoded_len = self.speech_encoder.encoder(audio_signal=processed_signal, length=processed_signal_length)
+            except Exception as e:
+                print(f"Error Occurred -> {e}")
+                print(f"processed_signal -> {input_signal.shape}")
+                print(f"processed_signal_length -> {input_signal_length.shape}")
 
-            if hasattr(self, 'embed_positions'):
-                embed_pos = self.embed_positions.weight
-                speech_embeds = encoded + embed_pos
-            else:
-                speech_embeds = encoded
+            speech_embeds, speech_embeds_len = self.speech_encoder.encoder(audio_signal=processed_signal, length=processed_signal_length)
 
             speech_embeds = torch.permute(speech_embeds, [0, 2, 1])
 

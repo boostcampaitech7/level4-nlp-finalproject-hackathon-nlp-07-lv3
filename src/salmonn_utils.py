@@ -85,8 +85,7 @@ class SALMONNTestDataset(Dataset):
             sil = np.zeros(sr - len(audio), dtype=float)
             audio = np.concatenate((audio, sil), axis=0)
 
-        assert sr == 16000
-        audio = audio[: sr * 30]  # truncate audio to at most 30s
+        audio = audio[: min(16000 * 30, len(audio))]  # truncate audio to at most 30s
 
         testset_id = ann["testset_id"]
         task = ann.get("task", "asr")

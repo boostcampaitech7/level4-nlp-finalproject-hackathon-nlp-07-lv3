@@ -14,8 +14,7 @@ model:
 
   token: "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"           # 개인 huggingface 키 입력
 
-  ckpt: ""            # 기학습된 가중치가 있다면 해당 가중치의 경로
-
+  ckpt: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/outputs_stage_1/202502022230/checkpoint_0.pth"            # 기학습된 가중치가 있다면 해당 가중치의 경로
 
   freeze_whisper: True
   freeze_beats: True
@@ -25,8 +24,8 @@ model:
   freeze_speech_QFormer: False
   window_level_Qformer: True
   num_speech_query_token: 1
-  second_per_window: 0.333333
-  second_stride: 0.333333
+  second_per_window: 0.2525
+  second_stride: 0.2525
 
   speech_llama_proj_model: ""
   freeze_speech_llama_proj: False
@@ -48,9 +47,9 @@ model:
 datasets:
   prefix: "/data/data_storage"
 
-  train_ann_path_1: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/stage_1_sample_data_V2.json"
+  train_ann_path_1: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/stage_2_sample_data_V2_remove.json"
   valid_ann_path_1: ""
-  train_ann_path_2: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/stage_2_sample_data_V2.json"
+  train_ann_path_2: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/stage_2_sample_data_V2_remove.json"
   valid_ann_path_2: ""
 
   train_manifest_path: "/data/ljm/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/manifest_train.jsonl"
@@ -71,10 +70,10 @@ run:
 
   # 에퐄 및 배치 관련 설정
   epoch_based: True        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
-  iters_per_epoch: 6000     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
+  iters_per_epoch: 1000     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
   accum_grad_iters: 1
-  batch_size_train: 4    # 원래 8
-  batch_size_eval: 4     # 원래 8
+  batch_size_train: 2    # 원래 8
+  batch_size_eval: 2     # 원래 8
   num_workers: 8     # 원래 8
 
   device: "cuda:1"

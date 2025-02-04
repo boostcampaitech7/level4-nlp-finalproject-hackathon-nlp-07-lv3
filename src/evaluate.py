@@ -137,8 +137,8 @@ def main(args):
 
         # Preprocess
         samples = prepare_sample(samples, cuda_enabled=torch.cuda.is_available())
-        batch_size = samples["spectrogram"].shape[0]
         raw_wav = samples.get("raw_wav", None)
+        batch_size = samples["raw_wav"].size(0)
         audio_padding_mask = samples.get("padding_mask", None)
 
         n_samples = salmonn_preprocessor.move_data_to_device(n_samples, 'cuda:1')

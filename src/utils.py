@@ -80,7 +80,7 @@ def apply_to_sample(f, sample):
 
 def move_to_cuda(sample):
     def _move_to_cuda(tensor):
-        return tensor.cuda()
+        return tensor.cuda(device='cuda:1')
 
     return apply_to_sample(_move_to_cuda, sample)
 
