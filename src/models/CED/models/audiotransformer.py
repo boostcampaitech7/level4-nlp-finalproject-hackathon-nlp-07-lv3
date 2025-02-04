@@ -205,14 +205,14 @@ class AudioTransformer(nn.Module):
         self.time_patch_out = time_patch_out
         self.freq_patch_out = freq_patch_out
 
-        self.front_end = FrontEnd(f_min=f_min,
-                                  f_max=f_max,
-                                  center=self.center,
-                                  win_size=self.win_size,
-                                  hop_size=self.hop_size,
-                                  sample_rate=16000,
-                                  n_fft=n_fft,
-                                  n_mels=self.n_mels)
+        # self.front_end = FrontEnd(f_min=f_min,
+        #                           f_max=f_max,
+        #                           center=self.center,
+        #                           win_size=self.win_size,
+        #                           hop_size=self.hop_size,
+        #                           sample_rate=16000,
+        #                           n_fft=n_fft,
+        #                           n_mels=self.n_mels)
 
         self.init_bn = nn.Sequential(
             Rearrange('b c f t -> b f c t'),
