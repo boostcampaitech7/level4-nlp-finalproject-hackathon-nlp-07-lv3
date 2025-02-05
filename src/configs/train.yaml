@@ -1,21 +1,15 @@
 wandb:
   project: "NOTA"
   entity: "NotyNoty"
-  key: ""             # 개인 W&B 키 입력할 것
   log: True           # False시 실험 기록 X
-
-
 
 model:
   # paths
   llama_path: "meta/Llama-3.2-1B-Instruct"
   whisper_path: "openai/whisper-large-v3"
-  beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로
-
-  token: ""           # 개인 huggingface 키 입력
+  beats_path: "ced_small"      # 다운받은 BEATs 모델 경로
 
   ckpt: ""            # 기학습된 가중치가 있다면 해당 가중치의 경로
-
 
   freeze_whisper: True
   freeze_beats: True
@@ -39,15 +33,15 @@ model:
 
   multi_prompt: True
   prompt_template: "USER: {}\nASSISTANT:"
-  prompt_path: "prompts/train_prompt.json"
-  test_prompt_path: "prompts/test_prompt.json"
+  prompt_path: "E:\Github\BoostClass AI Tech\Final Project\level4-nlp-finalproject-hackathon-nlp-07-lv3\src\prompts\train_prompt.json"
+  test_prompt_path: "E:\Github\BoostClass AI Tech\Final Project\level4-nlp-finalproject-hackathon-nlp-07-lv3\src\prompts\test_prompt.json"
   max_txt_len: 300
   end_sym: "<|eot_id|>"   # LLM 모델에 맞춰 바꿀 것
 
 datasets:
-  prefix: "/data/data_storage"
+  prefix: ""
 
-  train_ann_path: "./data/total_sample_V2.json"
+  train_ann_path: "E:\Github\BoostClass AI Tech\Final Project\level4-nlp-finalproject-hackathon-nlp-07-lv3\src\data\n_stage_1_sample_data_V2.json"
   valid_ann_path: ""
 
   whisper_path: "openai/whisper-large-v3"
@@ -69,13 +63,11 @@ run:
   batch_size_eval: 4     # 원래 8
   num_workers: 0     # 원래 8
 
-  device: "cuda"
+  device: "cuda:0"
   use_distributed: True # 원래 True(분산 환경에서는 True 맞음)
   amp: True
   world_size: 2          # 원래 2
   dist_url: "env://"
-
-
 
   # optimizer & scheduler
   optims:
@@ -86,4 +78,3 @@ run:
     min_lr: 1e-5
     weight_decay: 0.05
     beta2: 0.999
-
