@@ -46,6 +46,7 @@ src/Multi_Level_OT_main
 src/Multi-Level-OT-main
 
 # 실험 파일 및 pycharm 무시
+run.py
 test
 .idea
 *.xml
