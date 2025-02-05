@@ -102,9 +102,6 @@ def main():
     # print config
     cfg.pretty_print()
 
-    device = torch.device(cfg.config.run.device)
-    torch.cuda.set_device(device.index)
-
     # build stage1 datasets
     # 별도로 valid 지정 없는 경우 train만 생성 후 split
     # build datasets
