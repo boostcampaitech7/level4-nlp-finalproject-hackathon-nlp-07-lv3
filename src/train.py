@@ -68,7 +68,7 @@ def setup_seeds(config):
 def main():
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
     job_id = now()
-    envs = load_dotenv()
+    load_dotenv()
     date_wandb = job_id[4:12]
 
     # load config

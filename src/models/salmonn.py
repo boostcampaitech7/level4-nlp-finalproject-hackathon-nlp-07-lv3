@@ -22,11 +22,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from peft import LoraConfig, TaskType, get_peft_model
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    StoppingCriteriaList,
+)
 
-from . import modeling_ced
+from . import modeling_ced  # noqa
 from .beats.BEATs import BEATs, BEATsConfig
-from .modeling_ced import *  # noqa: F403
+from .modeling_ced import *  # noqa
 from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub

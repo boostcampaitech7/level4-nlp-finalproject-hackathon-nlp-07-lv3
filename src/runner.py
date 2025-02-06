@@ -239,8 +239,6 @@ class Runner:
 
     def train(self):
         start_time = time.time()
-        best_agg_metric = 0
-        best_epoch = 0
         best_save_directory = None  # 가장 좋은 모델 경로를 추적
 
         for cur_epoch in range(self.start_epoch, self.max_epoch):
