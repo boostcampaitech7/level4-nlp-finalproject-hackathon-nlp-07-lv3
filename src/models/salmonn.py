@@ -159,28 +159,29 @@ class SALMONN(nn.Module):
             logging.info("freeze Whisper")
 
         if self.ced_path:
-            logging.info("Loading ced Model")
+            logging.info("Loading CED Model")
             self.ced = getattr(modeling_ced, self.ced_path)(pretrained=True)
             self.ln_audio = nn.LayerNorm(self.ced.embed_dim)
             if freeze_beats:
                 for name, param in self.ced.named_parameters():
                     param.requires_grad = False
                 self.ced.eval()
-                logging.info("freeze BEATs")
+                logging.info("freeze CED")
+                
         elif self.beats_path:
             logging.info("Loading BEATs Model")
             beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
             beats_cfg = BEATsConfig(beats_ckpt["cfg"])
-            # non-speech model
+            
             self.beats = BEATs(beats_cfg)
             self.beats.load_state_dict(beats_ckpt["model"])
-            # non-speech
             self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
             if freeze_beats:
                 for name, param in self.beats.named_parameters():
                     param.requires_grad = False
                 self.beats.eval()
                 logging.info("freeze BEATs")
+                
         if self.use_speech_Qformer:
             if self.ced_path:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
