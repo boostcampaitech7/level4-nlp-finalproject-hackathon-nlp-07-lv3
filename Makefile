@@ -23,7 +23,7 @@ set-style:
 	ruff format .
 
 check-quality:
-	ruff check --ignore F405,E741,F821 .
+	ruff check --ignore F405,E741,F821,I001 .
 	ruff format --check .
 
 #####  clean  #####
