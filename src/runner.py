@@ -189,6 +189,9 @@ class Runner:
                             "train/lr": self.optimizer.param_groups[0]["lr"],
                         }
                     )
+                # 1만 iter 마다 체크포인트 저장
+                if i > 0 and i % 10000 == 0:
+                    self.save_checkpoint(cur_epoch = epoch, iteration = i, is_best=False)
             else:  # dryrun, no model availble
                 metric_logger.update(loss=0.0)
                 metric_logger.update(lr=0.0)
@@ -250,7 +253,7 @@ class Runner:
                 dist.barrier()
 
         # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
-        last_save_directory = self.save_checkpoint(cur_epoch, is_best=False)
+        last_save_directory = self.save_checkpoint(cur_epoch, iteration="last", is_best=False)
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -273,7 +276,7 @@ class Runner:
             pass
 
     @main_process
-    def save_checkpoint(self, cur_epoch, is_best=False):
+    def save_checkpoint(self, cur_epoch, iteration, is_best=False):
         """
         Save the checkpoint at the current epoch.
         """
@@ -296,9 +299,9 @@ class Runner:
         if is_best:
             save_to = os.path.join(self.output_dir, "checkpoint_best.pth")
         else:
-            save_to = os.path.join(self.output_dir, f"checkpoint_{cur_epoch}.pth")
+            save_to = os.path.join(self.output_dir, f"checkpoint_{cur_epoch}_{iteration}.pth")
 
-        logging.info(f"Saving checkpoint at epoch {cur_epoch} to {save_to}.")
+        logging.info(f"Saving checkpoint at epoch {cur_epoch}_{iteration} to {save_to}.")
         torch.save(save_obj, save_to)
 
         # Keep only the most recent two checkpoints
