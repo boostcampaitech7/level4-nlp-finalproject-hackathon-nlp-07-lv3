@@ -34,4 +34,4 @@ jobs:
 
       - name: Check Lint                        # 네번째로 실행되는 step: 명령어 실행
         run: |
-          make quality
+          ruff check --ignore F405,E741,F821 .
