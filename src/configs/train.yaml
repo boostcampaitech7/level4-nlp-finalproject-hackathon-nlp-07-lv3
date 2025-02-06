@@ -44,7 +44,7 @@ model:
 
 datasets:
   # (Required) 데이터셋 절대 경로
-  prefix: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/"  
+  prefix: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/"
 
   stage1_use_valid: False  # (Optional) Stage 1에서 검증 데이터 사용 여부 (Default = False)
   train_stage1_path: "n_stage_1_sample_data_V2.json"  # (Required) 학습 데이터 상대 경로
