@@ -43,7 +43,6 @@ class Runner:
         self.use_distributed = self.config.config.run.use_distributed
         self.start_epoch = 0
         self.max_epoch = self.config.config.run.optims.max_epoch
-        self.evaluate_only = self.config.config.run.evaluate
         self.cuda_enabled = self.device.type == "cuda"
 
         # test prompt
@@ -333,9 +332,6 @@ class Runner:
         best_save_directory = None  # 가장 좋은 모델 경로를 추적
 
         for cur_epoch in range(self.start_epoch, self.max_epoch):
-            if self.evaluate_only:
-                break
-
             # training phase
             logging.info("Training Phase")
             train_stats = self.train_epoch(cur_epoch)
@@ -363,12 +359,6 @@ class Runner:
 
         # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
         last_save_directory = self.save_checkpoint(cur_epoch, is_best=False)
-
-        # testing phase
-        if self.evaluate_only:
-            test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
-            if test_log is not None:
-                self.log_stats(test_log, split_name="test")
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
