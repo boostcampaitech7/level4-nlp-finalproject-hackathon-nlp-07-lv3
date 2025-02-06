@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 import torchaudio.transforms as audio_transforms
 
 from typing import Any, Callable, Optional, Tuple, Union
@@ -45,7 +45,7 @@ class FrontEnd(nn.Sequential):
         self.register_buffer('fbank_std', torch.tensor(6.55582))
 
     # Disable Autocast for FP16 training!
-    @autocast(enabled=False)
+    @autocast('cuda', enabled=False)
     def forward(self, x):
         x = super().forward(x)
         return (x - self.fbank_mean) / (2 * self.fbank_std) # BEATs와 동일 스케일링

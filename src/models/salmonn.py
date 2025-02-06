@@ -35,7 +35,7 @@ from . import modeling_ced
 class SALMONN(nn.Module):
     @classmethod
     def init_speech_Qformer(cls, num_query_token, speech_width, num_hidden_layers=2):
-        encoder_config = BertConfig.from_pretrained("bert-base-uncased")
+        encoder_config = BertConfig.from_pretrained("bert-base-uncased", trust_remote_code=True)
         encoder_config.num_hidden_layers = num_hidden_layers
         encoder_config.encoder_width = speech_width
         # insert cross-attention layer every other block
@@ -57,7 +57,7 @@ class SALMONN(nn.Module):
         enable_autocast = self.device != torch.device("cpu")
 
         if enable_autocast:
-            return torch.amp.autocast(device_type="cuda", dtype=dtype)
+            return torch.amp.autocast(device_type="cuda", dtype=dtype, enabled=True)
         else:
             return contextlib.nullcontext()
 

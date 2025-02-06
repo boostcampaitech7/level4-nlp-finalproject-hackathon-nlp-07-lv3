@@ -107,7 +107,7 @@ class Runner:
         # scaler
         self.use_amp = self.config.config.run.get("amp", False)
         if self.use_amp:
-            self.scaler = torch.cuda.amp.GradScaler()
+            self.scaler = torch.amp.GradScaler()
         else:
             self.scaler = None
 
@@ -160,7 +160,7 @@ class Runner:
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
-                with torch.cuda.amp.autocast(enabled=self.use_amp):
+                with torch.amp.autocast('cuda', enabled=self.use_amp):
                     loss = self.model(samples)["loss"]
 
                 if self.use_amp:
@@ -218,7 +218,7 @@ class Runner:
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled, device=self.config.config.run.device)
 
             if not self.dryrun:
-                with torch.cuda.amp.autocast(enabled=self.use_amp):
+                with torch.amp.autocast(device_type="cuda", enabled=self.use_amp):
                     forward_result = model(samples, verbose=True)
                 loss = forward_result.get("loss", 0)
                 correct = forward_result.get("correct", 0)
