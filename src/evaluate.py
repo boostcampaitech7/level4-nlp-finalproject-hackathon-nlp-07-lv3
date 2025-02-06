@@ -107,6 +107,7 @@ def main(args):
     salmonn_preprocessor.llama_model = llama_model
 
     # Load data
+    cfg.config.datasets['whisper_path'] = cfg.config.model['whisper_path']
     dataloader = get_dataset(cfg.config.datasets, cfg.config.run, args.task)
 
     # 설정 파일에서 경로를 읽어옴

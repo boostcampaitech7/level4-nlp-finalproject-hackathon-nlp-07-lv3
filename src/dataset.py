@@ -44,6 +44,10 @@ class SALMONNDataset(Dataset):
     def __len__(self):
         return len(self.annotation)
 
+    def _get_audio_path(self, path):
+        # 경로를 정규화하여 // 또는 / 문제를 해결
+        return os.path.normpath(os.path.join(self.prefix, path.lstrip('/').lstrip('\\')))
+
     def collater(self, samples):
         samples_spectrogram = [s["spectrogram"] for s in samples]
         cat_spectrogram = torch.stack(samples_spectrogram, dim=0)
