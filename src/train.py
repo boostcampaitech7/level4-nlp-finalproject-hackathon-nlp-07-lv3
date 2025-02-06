@@ -21,9 +21,9 @@ import numpy as np
 import pytz
 import torch
 import torch.backends.cudnn as cudnn
-import wandb
 from dotenv import load_dotenv
 
+import wandb
 from config import Config
 from dataset import SALMONNDataset
 from dist_utils import get_rank, init_distributed_mode
@@ -76,7 +76,7 @@ def main():
     cfg = Config(args)
     run_config = cfg.config.run
     run_config["output_dir"] = "outputs_stage_1"
-    
+
     model_config = cfg.config.model
     data_config = cfg.config.datasets
     wandb_config = cfg.config.wandb
@@ -130,17 +130,17 @@ def main():
 
     # stage1 wandb 종료
     wandb.finish()
-    
+
     if run_config.auto_second:
         del runner
         assert run_config["output_dir"]
         run_config["output_dir"] = "outputs_stage_2"
-        
+
         if wandb_config.log:
             wandb.init(
                 project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_Stage2_" + exp_name, config=cfg
             )
-        
+
         if data_config.stage2_use_valid:
             datasets = {
                 "train": SALMONNDataset(data_config.prefix, data_config.train_stage2_path, model_config.whisper_path),
@@ -150,7 +150,7 @@ def main():
             datasets = {
                 "train": SALMONNDataset(data_config.prefix, data_config.train_stage2_path, model_config.whisper_path),
             }
-            
+
         # build stage1 runner
         runner = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
 

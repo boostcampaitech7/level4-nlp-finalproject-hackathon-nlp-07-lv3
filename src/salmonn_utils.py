@@ -31,7 +31,7 @@ class SALMONNTestDataset(Dataset):
         super().__init__()
 
         self.prefix = prefix
-        
+
         ann_path = prefix + ann_path
         if not os.path.exists(ann_path):
             raise ValueError(
@@ -87,7 +87,7 @@ class SALMONNTestDataset(Dataset):
     def __getitem__(self, index):
         ann = self.annotation[index]
         audio_path = self._get_audio_path(ann["path"])
-        
+
         try:
             audio, sr = sf.read(audio_path)
         except (RuntimeError, IOError) as e:

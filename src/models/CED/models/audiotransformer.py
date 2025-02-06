@@ -3,19 +3,19 @@ https://arxiv.org/abs/2308.11957
 https://github.com/RicherMans/CED/tree/main
 '''
 
-from loguru import logger
 from functools import partial
-import math
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Callable, Optional
+
 import torch
 import torch.nn as nn
-from torch.amp import autocast
 import torchaudio.transforms as audio_transforms
 from einops import rearrange
 from einops.layers.torch import Rearrange
+from loguru import logger
+from torch.amp import autocast
 
-from .checkpoints import register_model, build_mdl
-from .layers import AudioPatchEmbed, DropPath, Mlp, trunc_normal_, to_2tuple
+from .checkpoints import build_mdl, register_model
+from .layers import AudioPatchEmbed, DropPath, Mlp, to_2tuple, trunc_normal_
 
 
 class FrontEnd(nn.Sequential):

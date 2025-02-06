@@ -1,6 +1,7 @@
 import subprocess
 import sys
 
+
 if __name__ == "__main__":
     #subprocess.run(["torchrun", "--nproc_per_node", "2",  "src/train.py", "--cfg-path", "src/configs/train.yaml"])
     subprocess.run([f'{sys.executable}', "src/train.py", "--cfg-path", "src/configs/train.yaml"])

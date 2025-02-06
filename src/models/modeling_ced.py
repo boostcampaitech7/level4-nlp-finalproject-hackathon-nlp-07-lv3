@@ -1,14 +1,14 @@
-import torch
-import torch.nn.functional as F
-import torch.nn as nn
-from torch.amp import autocast
-import torchaudio.transforms as audio_transforms
+from typing import Optional
 
-from typing import Any, Callable, Optional, Tuple, Union
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchaudio.transforms as audio_transforms
 from einops import rearrange
-from einops.layers.torch import Rearrange
+from torch.amp import autocast
 
 from .CED.models import *
+
 
 class FrontEnd(nn.Sequential):
 
@@ -40,7 +40,7 @@ class FrontEnd(nn.Sequential):
                                             hop_length=self.hop_size,
                                             n_mels=self.n_mels),
             audio_transforms.AmplitudeToDB(top_db=120))
-        
+
         self.register_buffer('fbank_mean', torch.tensor(15.41663))
         self.register_buffer('fbank_std', torch.tensor(6.55582))
 
@@ -69,13 +69,13 @@ class ExtendedCEDEncoder(AudioTransformer):
                  norm_layer=None,
                  act_layer=None,
                  init_values=None,
-                 target_length=3001, # Salmonn의 dataloader에서 input최대 30초로 상한 고정, (target_length 원래는 1012) 
+                 target_length=3001, # Salmonn의 dataloader에서 input최대 30초로 상한 고정, (target_length 원래는 1012)
                                      # T = floor[(L + 2*pad - win_length) / hop_length] + 1,  pad = n_fft//2 = 256
                                      # ex) 30초 오디오 → (30s * 16000) = 480,000 샘플
-                                     # L + 2 * pad = 480,000 + 512 = 480,512  
-                                     # 480,512 - 400 = 480,112  
-                                     # 480,112 / 160 = 3,000.7 → floor(3,000.7) = 3,000  
-                                     # T = 3,000 + 1 = 3,001  
+                                     # L + 2 * pad = 480,000 + 512 = 480,512
+                                     # 480,512 - 400 = 480,112
+                                     # 480,112 / 160 = 3,000.7 → floor(3,000.7) = 3,000
+                                     # T = 3,000 + 1 = 3,001
                  pooling='mean',
                  wavtransforms=None,
                  spectransforms=None,
@@ -121,7 +121,7 @@ class ExtendedCEDEncoder(AudioTransformer):
         x = self.front_end(x)
         x = self.forward_spectrogram(x)
         return x
-    
+
 def pad_audio(waveform, target_samples=480000):
     if waveform.size(-1) < target_samples:
         return F.pad(waveform, (0, target_samples - waveform.size(-1)))

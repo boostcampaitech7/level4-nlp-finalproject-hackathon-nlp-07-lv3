@@ -15,9 +15,9 @@
 import contextlib
 import json
 import logging
+import os
 import random
 
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -167,12 +167,12 @@ class SALMONN(nn.Module):
                     param.requires_grad = False
                 self.ced.eval()
                 logging.info("freeze CED")
-                
+
         elif self.beats_path:
             logging.info("Loading BEATs Model")
             beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
             beats_cfg = BEATsConfig(beats_ckpt["cfg"])
-            
+
             self.beats = BEATs(beats_cfg)
             self.beats.load_state_dict(beats_ckpt["model"])
             self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
@@ -181,7 +181,7 @@ class SALMONN(nn.Module):
                     param.requires_grad = False
                 self.beats.eval()
                 logging.info("freeze BEATs")
-                
+
         if self.use_speech_Qformer:
             if self.ced_path:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
@@ -559,7 +559,7 @@ class SALMONN(nn.Module):
         from dotenv import load_dotenv
         envs = load_dotenv()
         token = os.environ['HF_KEY']
-        
+
         llama_path = config.get("llama_path")
         whisper_path = config.get("whisper_path")
         freeze_whisper = config.get("freeze_whisper", True)
