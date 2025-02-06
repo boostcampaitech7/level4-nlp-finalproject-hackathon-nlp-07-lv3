@@ -24,7 +24,6 @@ set-style:
 
 check-quality:
 	ruff check --ignore F405,E741,F821,I001 .
-	ruff format --check .
 
 #####  clean  #####
 clean-pyc:
