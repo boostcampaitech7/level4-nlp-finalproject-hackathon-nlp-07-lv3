@@ -557,7 +557,7 @@ class SALMONN(nn.Module):
     @classmethod
     def from_config(cls, config):
         from dotenv import load_dotenv
-        envs = load_dotenv()
+        load_dotenv()
         token = os.environ['HF_KEY']
 
         llama_path = config.get("llama_path")
