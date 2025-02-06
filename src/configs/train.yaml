@@ -12,6 +12,7 @@ model:
   whisper_path: "openai/whisper-large-v3"
   beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로
   ced_path: ""
+  low_resource: False
 
   token: ""           # 개인 huggingface 키 입력
 
