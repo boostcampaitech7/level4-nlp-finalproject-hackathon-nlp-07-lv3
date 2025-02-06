@@ -131,11 +131,7 @@ def main():
     # stage1 wandb 종료
     wandb.finish()
     
-    ans = input('Stage 1 Finished, Continue to Stage 2? (y/n) : ')
-    while ans != 'y' and ans != 'n':
-        ans = input('Stage 1 Finished, Continue to Stage 2? (y/n) : ')
-    
-    if ans == 'y':
+    if run_config.auto_second:
         del runner
         assert run_config["output_dir"]
         run_config["output_dir"] = "outputs_stage_2"

@@ -59,6 +59,8 @@ run:
   seed: 42  # (Required) 랜덤 시드 값 (Default = 42)
   log_freq: 5  # (Optional) 로그 출력 주기 (Default = 5)
 
+  auto_second: True # True면 Stage-2까지 학습, False면 1만 학습
+
   # 에폭 및 배치 관련 설정
   epoch_based: False  # (Optional) True면 에폭 단위 학습, False면 iteration 단위 학습 (Default = False)
   iters_per_epoch: 30  # (Required) 에폭당 반복 횟수 (Default = 3000)
