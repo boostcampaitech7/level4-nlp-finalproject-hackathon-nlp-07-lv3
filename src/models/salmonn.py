@@ -17,6 +17,7 @@ import json
 import logging
 import random
 
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -116,6 +117,7 @@ class SALMONN(nn.Module):
                     load_in_8bit=True,
                     device_map={"": device_8bit},
                     token=token,
+                    attn_implementation="sdpa",
                 )
             else:
                 self.llama_model = AutoModelForCausalLM.from_pretrained(
@@ -214,16 +216,11 @@ class SALMONN(nn.Module):
         self.prompt_dict = {}
         if prompt_path:
             try:
-                with open(prompt_path, "r") as file:
+                with open(prompt_path, "r", encoding="utf-8") as file:
                     raw_prompts = json.load(file)
-            except json.JSONDecodeError:
-                print("Failed to decode JSON! Trying with utf-8 encoding.")
-                try:
-                    with open(prompt_path, "r", encoding="utf-8") as file:
-                        raw_prompts = json.load(file)
-                except json.JSONDecodeError as e:
-                    print(f"JSON decoding error even with utf-8 encoding: {e}")
-                    raise
+            except json.JSONDecodeError as e:
+                print(f"JSON decoding error with utf-8 encoding: {e}")
+                raise
             except IOError as e:
                 print(f"Failed to open or read the file: {e}")
                 raise
@@ -414,11 +411,13 @@ class SALMONN(nn.Module):
             if not self.lora
             else self.llama_model.model.model.embed_tokens(to_regress_tokens.input_ids)
         )
+
         # -100 은 어텐션에서 무시해야하는 토큰 지정하여 loss 계산 시에도 무시
         # 길이를 맞추기 위해서 적용된 Padding token은 Cross-Entropy Loss 계산 시에는 필요가 없으니 이는 마스킹 처리
         targets = to_regress_tokens.input_ids.masked_fill(
             to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
         )
+
         # 마찬가지로 오디오 인코더에서 들어온 값들은 LLM이 출력하는 값이 아니기에 여기도 Loss 계산 시에 무시하기 위해서
         # 오디오 인코더 길이 만큼의 -100 으로 마스킹 처리
         empty_targets = (
@@ -531,6 +530,8 @@ class SALMONN(nn.Module):
 
     @classmethod
     def from_config(cls, config):
+        token = os.environ['HF_KEY']
+        
         llama_path = config.get("llama_path")
         whisper_path = config.get("whisper_path")
         freeze_whisper = config.get("freeze_whisper", True)
@@ -560,7 +561,6 @@ class SALMONN(nn.Module):
         low_resource = config.get("low_resource", False)
         device_8bit = config.get("device_8bit", 0)
 
-        token = config.get("token", None)
         only_preprocessor = config.get("only_preprocessor", None)
 
         model = cls(

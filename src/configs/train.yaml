@@ -40,11 +40,13 @@ model:
   end_sym: "<|eot_id|>"   # LLM 모델에 맞춰 End Token 값을 바꿀 것
 
 datasets:
-  prefix: "E:\\Github\\BoostClass AI Tech\\Final Project\\level4-nlp-finalproject-hackathon-nlp-07-lv3\\src\\data\\"
+  prefix: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/"
 
+  stage1_use_valid : False
   train_stage1_path: "n_stage_1_sample_data_V2.json"
   valid_stage1_path: ""
 
+  stage2_use_valid : False
   train_stage2_path: "n_stage_1_sample_data_V2.json"
   valid_stage2_path: ""
   
@@ -53,7 +55,6 @@ datasets:
 run:
   # log & settings
   seed: 42
-  output_dir: "outputs_stage_mix"
   evaluate: False # if True, only evaluate model on test data
   # exp_name: "llama-3.2-1B-1percent-stage1" # 코드 전체에서 exp_name이라는 변수 또는 string이 보이지 않음
 
@@ -61,7 +62,7 @@ run:
 
   # 에퐄 및 배치 관련 설정
   epoch_based: False        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
-  iters_per_epoch: 100     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
+  iters_per_epoch: 30     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
   accum_grad_iters: 1
   batch_size_train: 4    # 원래 8
   batch_size_eval: 4     # 원래 8

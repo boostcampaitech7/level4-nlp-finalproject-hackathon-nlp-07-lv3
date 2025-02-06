@@ -22,6 +22,7 @@ import pytz
 import torch
 import torch.backends.cudnn as cudnn
 import wandb
+from dotenv import load_dotenv
 
 from config import Config
 from dataset import SALMONNDataset
@@ -67,30 +68,35 @@ def setup_seeds(config):
 def main():
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
     job_id = now()
+    envs = load_dotenv()
     date_wandb = job_id[4:12]
 
     # load config
     args = parse_args()
     cfg = Config(args)
     run_config = cfg.config.run
+    run_config["output_dir"] = "outputs_stage_1"
+    
     model_config = cfg.config.model
     data_config = cfg.config.datasets
     wandb_config = cfg.config.wandb
 
-    exp_name = input("write wandb exp_name:")
+    # exp_name = input("write wandb exp_name:")
+    # while exp_name == "":
+    #     exp_name = input("write wandb exp_name:")
+    exp_name = 'test'
 
     # Wandb setup
     if wandb_config.log:
-        wandb.login(key=wandb_config.key)
+        wandb.login(key=os.environ['WANDB_KEY'])
         wandb.init(
-            project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_ASR_" + exp_name, config=cfg
+            project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_Stage1_" + exp_name, config=cfg
         )
 
     # initialize distributed training
     init_distributed_mode(run_config)
     SEED = setup_seeds(run_config)
     setup_logger()  # set after init_distributed_mode() to only log on master.
-
 
     if run_config.use_distributed:  # 분산 모드 여부 확인
         global_rank = int(os.environ["RANK"])
@@ -102,18 +108,15 @@ def main():
     # print config
     cfg.pretty_print()
 
-    # build stage1 datasets
-    # 별도로 valid 지정 없는 경우 train만 생성 후 split
     # build datasets
-
-    if data_config.valid_ann_path:
+    if data_config.stage1_use_valid:
         datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path, data_config.whisper_path),
-            "valid": SALMONNDataset(data_config.prefix, data_config.valid_ann_path, data_config.whisper_path),
+            "train": SALMONNDataset(data_config.prefix, data_config.train_stage1_path, model_config.whisper_path),
+            "valid": SALMONNDataset(data_config.prefix, data_config.valid_stage1_path, model_config.whisper_path),
         }
     else:
         datasets = {
-            "train": SALMONNDataset(data_config.prefix, data_config.train_ann_path, data_config.whisper_path),
+            "train": SALMONNDataset(data_config.prefix, data_config.train_stage1_path, model_config.whisper_path),
         }
 
     # build model
@@ -127,6 +130,39 @@ def main():
 
     # stage1 wandb 종료
     wandb.finish()
+    
+    ans = input('Stage 1 Finished, Continue to Stage 2? (y/n) : ')
+    while ans != 'y' and ans != 'n':
+        ans = input('Stage 1 Finished, Continue to Stage 2? (y/n) : ')
+    
+    if ans == 'y':
+        del runner
+        assert run_config["output_dir"]
+        run_config["output_dir"] = "outputs_stage_2"
+        
+        if wandb_config.log:
+            wandb.init(
+                project=wandb_config.project, entity=wandb_config.entity, name=date_wandb + "_Stage2_" + exp_name, config=cfg
+            )
+        
+        if data_config.stage2_use_valid:
+            datasets = {
+                "train": SALMONNDataset(data_config.prefix, data_config.train_stage2_path, model_config.whisper_path),
+                "valid": SALMONNDataset(data_config.prefix, data_config.valid_stage2_path, model_config.whisper_path),
+            }
+        else:
+            datasets = {
+                "train": SALMONNDataset(data_config.prefix, data_config.train_stage2_path, model_config.whisper_path),
+            }
+            
+        # build stage1 runner
+        runner = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
+
+        # stage1 train, return 마지막 ckpt 경로 넘겨 받음
+        runner.train()
+
+        # stage1 wandb 종료
+        wandb.finish()
 
 
 if __name__ == "__main__":

@@ -51,16 +51,11 @@ class Runner:
         test_prompt_path = self.config.config.model.get("test_prompt_path", "")
         if test_prompt_path:
             try:
-                with open(test_prompt_path, "r") as f:
+                with open(test_prompt_path, "r", encoding="utf-8") as f:
                     self.test_prompt_dict = json.load(f)
-            except json.JSONDecodeError:
-                print("Failed to decode JSON! Trying with utf-8 encoding.")
-                try:
-                    with open(test_prompt_path, "r", encoding="utf-8") as f:
-                        self.test_prompt_dict = json.load(f)
-                except json.JSONDecodeError as e:
-                    print(f"JSON decoding error even with utf-8 encoding: {e}")
-                    raise
+            except json.JSONDecodeError as e:
+                print(f"JSON decoding error with utf-8 encoding: {e}")
+                raise
             except IOError as e:
                 print(f"Failed to open or read the file: {e}")
                 raise
