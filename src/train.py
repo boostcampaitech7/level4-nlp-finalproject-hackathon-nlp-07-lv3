@@ -125,7 +125,7 @@ def main():
     # build stage1 runner
     runner = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
 
-    # stage1 train, return 마지막 ckpt 경로 넘겨 받음
+    # stage1 train
     runner.train()
 
     # stage1 wandb 종료
@@ -151,10 +151,10 @@ def main():
                 "train": SALMONNDataset(data_config.prefix, data_config.train_stage2_path, model_config.whisper_path),
             }
 
-        # build stage1 runner
+        # build stage2 runner
         runner = Runner(cfg, model, datasets, job_id, args.dryrun, SEED)
 
-        # stage1 train, return 마지막 ckpt 경로 넘겨 받음
+        # stage2 train
         runner.train()
 
         # stage1 wandb 종료
