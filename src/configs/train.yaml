@@ -7,10 +7,13 @@ model:
   # paths
   llama_path: "meta-llama/Llama-3.2-1B-Instruct"
   whisper_path: "openai/whisper-large-v3"
-  beats_path: "ced_small"      # 다운받은 BEATs 모델 경로 (REQUIRED)
+  #beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로
+  ced_path: "ced_small"
+  
+  # 기학습된 가중치 경로 (Optional)
+  ckpt: ""            
 
-  ckpt: ""            # 기학습된 가중치 경로 (Optional)
-
+  low_resource: False
   freeze_whisper: True
   freeze_beats: True
 

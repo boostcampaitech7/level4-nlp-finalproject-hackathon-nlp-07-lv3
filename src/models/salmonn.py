@@ -24,12 +24,12 @@ import torch.nn.functional as F
 from peft import LoraConfig, TaskType, get_peft_model
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
 
+from . import modeling_ced
 from .beats.BEATs import BEATs, BEATsConfig
+from .modeling_ced import *  # noqa: F403
 from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub
-from .modeling_ced import *
-from . import modeling_ced
 
 
 class SALMONN(nn.Module):
@@ -66,6 +66,7 @@ class SALMONN(nn.Module):
         llama_path="",
         whisper_path="",
         freeze_whisper=True,
+        ced_path="",
         beats_path="",
         freeze_beats=True,
         use_speech_Qformer=True,
@@ -92,6 +93,7 @@ class SALMONN(nn.Module):
     ):
         super().__init__()
 
+        self.ced_path = ced_path
         self.beats_path = beats_path
         self.use_speech_Qformer = use_speech_Qformer
         self.window_level_Qformer = window_level_Qformer
@@ -156,20 +158,39 @@ class SALMONN(nn.Module):
             self.speech_encoder.eval()
             logging.info("freeze Whisper")
 
-        if self.beats_path:
+        if self.ced_path:
+            logging.info("Loading ced Model")
+            self.ced = getattr(modeling_ced, self.ced_path)(pretrained=True)
+            self.ln_audio = nn.LayerNorm(self.ced.embed_dim)
+            if freeze_beats:
+                for name, param in self.ced.named_parameters():
+                    param.requires_grad = False
+                self.ced.eval()
+                logging.info("freeze BEATs")
+        elif self.beats_path:
             logging.info("Loading BEATs Model")
-            self.beats = getattr(modeling_ced, self.beats_path)(pretrained=True)
-            self.ln_audio = nn.LayerNorm(self.beats.embed_dim)
+            beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
+            beats_cfg = BEATsConfig(beats_ckpt["cfg"])
+            # non-speech model
+            self.beats = BEATs(beats_cfg)
+            self.beats.load_state_dict(beats_ckpt["model"])
+            # non-speech
+            self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
             if freeze_beats:
                 for name, param in self.beats.named_parameters():
                     param.requires_grad = False
                 self.beats.eval()
                 logging.info("freeze BEATs")
         if self.use_speech_Qformer:
-            if self.beats_path:
+            if self.ced_path:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
                     num_query_token=num_speech_query_token,
-                    speech_width=self.speech_encoder.config.d_model + self.beats.embed_dim
+                    speech_width=self.speech_encoder.config.d_model + self.ced.embed_dim
+                )
+            elif self.beats_path:
+                self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
+                    num_query_token=num_speech_query_token,
+                    speech_width=self.speech_encoder.config.d_model + self.beats.cfg.encoder_embed_dim,
                 )
             else:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
@@ -292,8 +313,12 @@ class SALMONN(nn.Module):
             # speech
             speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
             # non-speech
-            if self.beats_path and raw_wav is not None:
-                audio_embeds = self.beats.forward(raw_wav)
+            if self.ced_path and raw_wav is not None:
+                audio_embeds = self.ced.forward(raw_wav)
+            elif self.beats_path and raw_wav is not None:
+                audio_embeds, _ = self.beats.extract_features(
+                    raw_wav, padding_mask=audio_padding_mask, feature_only=True
+                )
             else:
                 audio_embeds = None
 
@@ -536,6 +561,7 @@ class SALMONN(nn.Module):
         whisper_path = config.get("whisper_path")
         freeze_whisper = config.get("freeze_whisper", True)
         beats_path = config.get("beats_path", "")
+        ced_path = config.get("ced_path", "")
         freeze_beats = config.get("freeze_beats", True)
 
         use_speech_Qformer = config.get("use_speech_Qformer", True)
@@ -568,6 +594,7 @@ class SALMONN(nn.Module):
             whisper_path=whisper_path,
             freeze_whisper=freeze_whisper,
             beats_path=beats_path,
+            ced_path = ced_path,
             freeze_beats=freeze_beats,
             use_speech_Qformer=use_speech_Qformer,
             num_speech_query_token=num_speech_query_token,
