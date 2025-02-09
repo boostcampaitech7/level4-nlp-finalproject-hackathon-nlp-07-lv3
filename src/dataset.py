@@ -29,8 +29,9 @@ class SALMONNDataset(Dataset):
     def __init__(self, prefix, ann_path, whisper_path):
         super().__init__()
 
-        # 경로 검증: 절대 경로인지 확인
-        if not os.path.isabs(prefix):
+        # 경로 검증
+        ann_path = prefix + ann_path
+        if not os.path.exists(ann_path):
             raise ValueError(
                 f"Provided prefix path '{prefix}' is not an absolute path. "
                 "Please provide an absolute path to the dataset. fix run.prefix which is in configs/train.yaml"
@@ -42,6 +43,10 @@ class SALMONNDataset(Dataset):
 
     def __len__(self):
         return len(self.annotation)
+
+    def _get_audio_path(self, path):
+        # 경로를 정규화하여 // 또는 / 문제를 해결
+        return os.path.normpath(os.path.join(self.prefix, path.lstrip('/').lstrip('\\')))
 
     def collater(self, samples):
         samples_spectrogram = [s["spectrogram"] for s in samples]
@@ -112,7 +117,7 @@ class SALMONNDataset(Dataset):
 
     def _get_audio_path(self, path):
         # 경로를 정규화하여 // 또는 / 문제를 해결
-        return os.path.normpath(os.path.join(self.prefix, path.lstrip('/')))
+        return os.path.normpath(os.path.join(self.prefix, path.lstrip('/').lstrip('\\')))
 
     def _load_fallback_audio(self):
         try:

@@ -74,6 +74,7 @@ class MockDataset(SALMONNDataset):
 
     @staticmethod
     def make_mock_dataloader(cfg, sr, audio_length, dataset_length=100, num_workers=0):
+        cfg.config.datasets['whisper_path'] = cfg.config.model['whisper_path']
         dataset = MockDataset(cfg, sr, audio_length, dataset_length)
         cfg.config.run.num_workers = num_workers  # config 객체에 num_workers 설정
         return get_dataloader(dataset, cfg.config.run, is_train=False, use_distributed=False)

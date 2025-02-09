@@ -1,89 +1,88 @@
 wandb:
-  project: "NOTA"
-  entity: "NotyNoty"
-  key: ""             # 개인 W&B 키 입력할 것
-  log: True           # False시 실험 기록 X
-
-
+  project: "NOTA"  # (Required) WandB 프로젝트 이름
+  entity: "NotyNoty"  # (Required) WandB 사용자 또는 팀 이름
+  log: True  # (Optional) False 시 실험 기록 안 함 (Default = True)
 
 model:
   # paths
-  llama_path: "meta/Llama-3.2-1B-Instruct"
-  whisper_path: "openai/whisper-large-v3"
-  beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"      # 다운받은 BEATs 모델 경로
+  llama_path: "meta-llama/Llama-3.2-1B-Instruct"  # (Required) LLaMA 모델 경로
+  whisper_path: "openai/whisper-large-v3"  # (Required) Whisper 모델 경로
+  beats_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"  # (Required) BEATs 모델 절대 경로
+  ced_path: "ced_small"  # (Optional) 사용하려는 CED 모델 경로 (Default = "ced_small")
 
-  token: ""           # 개인 huggingface 키 입력
+  use_beats: False  # (Optional) beats 모델의 사용여부 ced 사용시 False (Default = False)
 
-  ckpt: ""            # 기학습된 가중치가 있다면 해당 가중치의 경로
+  # 기학습된 가중치 경로 (Optional)
+  ckpt: ""  # (Optional) 학습된 모델 체크포인트 경로 (Default = "")
 
-
-  freeze_whisper: True
-  freeze_beats: True
+  low_resource: False  # (Optional) 저자원 환경에서 최적화 여부 (Default = False)
+  freeze_whisper: True  # (Optional) Whisper 모델 가중치 고정 여부 (Default = True)
+  freeze_beats: True  # (Optional) BEATs 모델 가중치 고정 여부 (Default = True)
 
   # window-level Q-Former
-  use_speech_Qformer: True
-  freeze_speech_QFormer: False
-  window_level_Qformer: True
-  num_speech_query_token: 1
-  second_per_window: 0.333333
-  second_stride: 0.333333
+  use_speech_Qformer: True  # (Required) 음성 Q-Former 사용 여부 (Default = True)
+  freeze_speech_QFormer: False  # (Optional) 음성 Q-Former 가중치 고정 여부 (Default = False)
+  window_level_Qformer: True  # (Optional) 윈도우 기반 Q-Former 활성화 여부 (Default = True)
+  num_speech_query_token: 1  # (Required) 음성 Q-Former에서 사용할 Query Token 개수 (Default = 1)
+  second_per_window: 0.333333  # (Required) 윈도우당 길이 (초 단위) (Default = 0.333333)
+  second_stride: 0.333333  # (Required) 윈도우 간 간격 (초 단위) (Default = 0.333333)
 
-  speech_llama_proj_model: ""
-  freeze_speech_llama_proj: False
+  speech_llama_proj_model: ""  # (Optional) Q-former to LLM 선형 레이어 모델 경로 (Default = "")
+  freeze_speech_llama_proj: False  # (Optional) 모델 가중치 고정 여부 (Default = False)
 
   # LoRA
-  lora: True
-  lora_rank: 8
-  lora_alpha: 32
-  lora_dropout: 0.1
+  lora: True  # (Optional) LoRA 활성화 여부 (Default = True)
+  lora_rank: 8  # (Required) LoRA 랭크 값 (Default = 8)
+  lora_alpha: 32  # (Required) LoRA 알파 값 (Default = 32)
+  lora_dropout: 0.1  # (Required) LoRA 드롭아웃 비율 (Default = 0.1)
 
-  multi_prompt: True
-  prompt_template: "USER: {}\nASSISTANT:"
-  prompt_path: "prompts/train_prompt.json"
-  test_prompt_path: "prompts/test_prompt.json"
-  max_txt_len: 300
-  end_sym: "<|eot_id|>"   # LLM 모델에 맞춰 바꿀 것
+  multi_prompt: True  # (Optional) 멀티 프롬프트 사용 여부 (Default = True)
+  prompt_template: "USER: {}\nASSISTANT:"  # (Required) 프롬프트 템플릿
+  prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/train_prompt.json"  # (Required) 학습 프롬프트 파일 경로
+  test_prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/test_prompt.json"  # (Required) 테스트 프롬프트 파일 경로
+
+  max_txt_len: 300  # (Required) 최대 텍스트 길이 (Default = 300)
+  end_sym: "<|eot_id|>"  # (Required) LLM 모델의 종료 토큰
 
 datasets:
-  prefix: "/data/data_storage"
+  # (Required) 데이터셋 절대 경로
+  prefix: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/"
 
-  train_ann_path: "./data/total_sample_V2.json"
-  valid_ann_path: ""
+  stage1_use_valid: False  # (Optional) Stage 1에서 검증 데이터 사용 여부 (Default = False)
+  train_stage1_path: "n_stage_1_sample_data_V2.json"  # (Required) 학습 데이터 상대 경로
+  valid_stage1_path: ""  # (Optional) 검증 데이터 상대 경로 (Default = "")
 
-  whisper_path: "openai/whisper-large-v3"
+  stage2_use_valid: False
+  train_stage2_path: "n_stage_1_sample_data_V2.json"
+  valid_stage2_path: ""
 
 run:
   # log & settings
-  seed: 42
-  output_dir: "outputs_stage_mix"
-  evaluate: False # if True, only evaluate model on test data
-  # exp_name: "llama-3.2-1B-1percent-stage1" # 코드 전체에서 exp_name이라는 변수 또는 string이 보이지 않음
+  seed: 42  # (Required) 랜덤 시드 값 (Default = 42)
+  log_freq: 5  # (Optional) 로그 출력 주기 (Default = 5)
 
-  log_freq: 5            # 원래 5
+  auto_second: True # True면 Stage-2까지 학습, False면 1만 학습
 
-  # 에퐄 및 배치 관련 설정
-  epoch_based: True        # epoch_based 설정 이거 True로 놓으면 아래 iters_per_epoch 불필요
-  iters_per_epoch: 3000     # 원래 3000 // 이렇게하면 에퐄당 딱 3000만큼만 iter 돌고 에포크 넘어감.
-  accum_grad_iters: 1
-  batch_size_train: 4    # 원래 8
-  batch_size_eval: 4     # 원래 8
-  num_workers: 0     # 원래 8
+  # 에폭 및 배치 관련 설정
+  epoch_based: False  # (Optional) True면 에폭 단위 학습, False면 iteration 단위 학습 (Default = False)
+  iters_per_epoch: 30  # (Required) 에폭당 반복 횟수 (Default = 3000)
+  accum_grad_iters: 1  # (Required) Gradient accumulation step 수 (Default = 1)
+  batch_size_train: 4  # (Required) 학습 배치 크기 (Default = 4)
+  batch_size_eval: 4  # (Required) 평가 배치 크기 (Default = 4)
+  num_workers: 0  # (Optional) 데이터 로딩 워커 수 (Default = 0)
 
-  device: "cuda"
-  use_distributed: True # 원래 True(분산 환경에서는 True 맞음)
-  amp: True
-  world_size: 2          # 원래 2
-  dist_url: "env://"
-
-
+  device: "cuda:0"  # (Required) 사용 GPU 설정, GPU index를 반드시 붙여야 함
+  use_distributed: True  # (Optional) 분산 학습 활성화 여부 (Default = True)
+  amp: True  # (Optional) 자동 혼합 정밀도(Amp) 사용 여부 (Default = True)
+  world_size: 2  # (Required) 분산 학습에서 사용할 GPU 수 (Default = 2)
+  dist_url: "env://"  # (Required) 분산 학습 통신 URL
 
   # optimizer & scheduler
   optims:
-    max_epoch: 1        # 원래 30
-    warmup_steps: 500      # 원래 3000
-    warmup_start_lr: 1e-6
-    init_lr: 1e-4
-    min_lr: 1e-5
-    weight_decay: 0.05
-    beta2: 0.999
-
+    max_epoch: 1  # (Required) 최대 학습 에폭 수 (Default = 1)
+    warmup_steps: 500  # (Required) Warmup 단계 스텝 수 (Default = 500)
+    warmup_start_lr: 1e-6  # (Required) Warmup 시작 학습률 (Default = 1e-6)
+    init_lr: 1e-4  # (Required) 초기 학습률 (Default = 1e-4)
+    min_lr: 1e-5  # (Required) 최소 학습률 (Default = 1e-5)
+    weight_decay: 0.05  # (Required) 가중치 감소 계수 (Default = 0.05)
+    beta2: 0.999  # (Required) Adam 옵티마이저의 Beta2 값 (Default = 0.999)

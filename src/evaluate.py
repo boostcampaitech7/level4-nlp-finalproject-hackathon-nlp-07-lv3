@@ -1,6 +1,5 @@
 import argparse
 import json
-import logging
 import os
 import random
 import time
@@ -107,6 +106,7 @@ def main(args):
     salmonn_preprocessor.llama_model = llama_model
 
     # Load data
+    cfg.config.datasets['whisper_path'] = cfg.config.model['whisper_path']
     dataloader = get_dataset(cfg.config.datasets, cfg.config.run, args.task)
 
     # 설정 파일에서 경로를 읽어옴
@@ -157,7 +157,7 @@ def main(args):
         # Generation
         outputs = llama_model.model.generate(
             inputs_embeds=embeds,
-            pad_token_id=llama_model.config.eos_token_id[0],  # 어떤 대는 [0] 같은 별도의 인덱싱 불요
+            pad_token_id=llama_model.config.eos_token_id,  # Llama의 경우 llama_model.config.eos_token_id[0]
             max_new_tokens=generate_cfg.get("max_new_tokens", 200),
             num_beams=generate_cfg.get("num_beams", 4),
             do_sample=generate_cfg.get("do_sample", False),
@@ -172,8 +172,6 @@ def main(args):
         results = tokenizer.batch_decode(outputs)
         hyp = [result.split(generate_cfg.end_sym)[0].lower() for result in results]
 
-        # 잘 생성되고 있는지 디버깅
-        logging.info(f"생성된 text: {hyp}")
         hyps.extend(hyp)
 
         if not args.make_submission:

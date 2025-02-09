@@ -18,6 +18,10 @@
 - json 파일은 경로 존재하지 않는 부분 제거한 구글 드라이브 참고할 것 (링크된 이슈 참고)
   - https://github.com/boostcampaitech7/level4-nlp-finalproject-hackathon-nlp-07-lv3/issues/14
 
+7. .env 파일을 프로젝트 루트 디렉토리에 생성하고 안에 2가지 키를 적으셔야 합니다.
+- HF_KEY='huggingface api key'
+- WANDB_KEY='wandb api key'
+
 ---
 
 # 2. train

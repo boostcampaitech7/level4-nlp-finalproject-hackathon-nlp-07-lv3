@@ -1,9 +1,11 @@
-import torch
-from einops import rearrange
-import math
 import collections
-import torch.nn as nn
+import math
 from typing import Any, Callable, Optional, Tuple, Union
+
+import torch
+import torch.nn as nn
+from einops import rearrange
+
 
 Conv_Kernel = Union[int, Tuple[int, int]]
 

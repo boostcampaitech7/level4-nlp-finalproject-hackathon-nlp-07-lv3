@@ -15,26 +15,32 @@
 import contextlib
 import json
 import logging
+import os
 import random
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from peft import LoraConfig, TaskType, get_peft_model
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    StoppingCriteriaList,
+)
 
+from . import modeling_ced  # noqa
 from .beats.BEATs import BEATs, BEATsConfig
+from .modeling_ced import *  # noqa
 from .modeling_whisper import WhisperModel
 from .Qformer import BertConfig, BertLMHeadModel
 from .utils import StoppingCriteriaSub
-from .modeling_ced import *
-from . import modeling_ced
 
 
 class SALMONN(nn.Module):
     @classmethod
     def init_speech_Qformer(cls, num_query_token, speech_width, num_hidden_layers=2):
-        encoder_config = BertConfig.from_pretrained("bert-base-uncased")
+        encoder_config = BertConfig.from_pretrained("bert-base-uncased", trust_remote_code=True)
         encoder_config.num_hidden_layers = num_hidden_layers
         encoder_config.encoder_width = speech_width
         # insert cross-attention layer every other block
@@ -56,7 +62,7 @@ class SALMONN(nn.Module):
         enable_autocast = self.device != torch.device("cpu")
 
         if enable_autocast:
-            return torch.amp.autocast(device_type="cuda", dtype=dtype)
+            return torch.amp.autocast(device_type="cuda", dtype=dtype, enabled=True)
         else:
             return contextlib.nullcontext()
 
@@ -65,7 +71,9 @@ class SALMONN(nn.Module):
         llama_path="",
         whisper_path="",
         freeze_whisper=True,
+        ced_path="",
         beats_path="",
+        use_beats=False,
         freeze_beats=True,
         use_speech_Qformer=True,
         num_speech_query_token=1,
@@ -91,7 +99,9 @@ class SALMONN(nn.Module):
     ):
         super().__init__()
 
+        self.ced_path = ced_path
         self.beats_path = beats_path
+        self.use_beats = use_beats
         self.use_speech_Qformer = use_speech_Qformer
         self.window_level_Qformer = window_level_Qformer
         self.second_per_window = second_per_window
@@ -103,8 +113,13 @@ class SALMONN(nn.Module):
         self.low_resource = low_resource
 
         logging.info("Loading LLaMA Tokenizer")
-        self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path, use_fast=False, token=token)
-        self.llama_tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+        self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path,
+                                                             use_fast=False,
+                                                             token=token,
+                                                             trust_remote_code = True,
+                                                             padding_side="right",
+                                                             bos_token="<|im_start|>",
+                                                             eos_token="<|im_end|>")
         self.llama_tokenizer.padding_side = "right"
 
         if not only_preprocessor:
@@ -116,6 +131,7 @@ class SALMONN(nn.Module):
                     load_in_8bit=True,
                     device_map={"": device_8bit},
                     token=token,
+                    attn_implementation="sdpa",
                 )
             else:
                 self.llama_model = AutoModelForCausalLM.from_pretrained(
@@ -137,6 +153,7 @@ class SALMONN(nn.Module):
                     r=lora_rank,
                     lora_alpha=lora_alpha,
                     lora_dropout=lora_dropout,
+                    target_modules = ["q_proj", "v_proj", "gate_proj"]
                 )
                 self.llama_model = get_peft_model(self.llama_model, self.peft_config)
                 self.llama_model.print_trainable_parameters()
@@ -154,20 +171,40 @@ class SALMONN(nn.Module):
             self.speech_encoder.eval()
             logging.info("freeze Whisper")
 
-        if self.beats_path:
+        if self.ced_path and not self.use_beats:
+            logging.info("Loading CED Model")
+            self.ced = getattr(modeling_ced, self.ced_path)(pretrained=True)
+            self.ln_audio = nn.LayerNorm(self.ced.embed_dim)
+            if freeze_beats:
+                for name, param in self.ced.named_parameters():
+                    param.requires_grad = False
+                self.ced.eval()
+                logging.info("freeze CED")
+
+        elif self.beats_path and self.use_beats:
             logging.info("Loading BEATs Model")
-            self.beats = getattr(modeling_ced, self.beats_path)(pretrained=True)
-            self.ln_audio = nn.LayerNorm(self.beats.embed_dim)
+            beats_ckpt = torch.load(self.beats_path, map_location="cpu", weights_only=True)
+            beats_cfg = BEATsConfig(beats_ckpt["cfg"])
+
+            self.beats = BEATs(beats_cfg)
+            self.beats.load_state_dict(beats_ckpt["model"])
+            self.ln_audio = nn.LayerNorm(self.beats.cfg.encoder_embed_dim)
             if freeze_beats:
                 for name, param in self.beats.named_parameters():
                     param.requires_grad = False
                 self.beats.eval()
                 logging.info("freeze BEATs")
+
         if self.use_speech_Qformer:
-            if self.beats_path:
+            if self.ced_path and not self.use_beats:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
                     num_query_token=num_speech_query_token,
-                    speech_width=self.speech_encoder.config.d_model + self.beats.embed_dim
+                    speech_width=self.speech_encoder.config.d_model + self.ced.embed_dim
+                )
+            elif self.beats_path and self.use_beats:
+                self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
+                    num_query_token=num_speech_query_token,
+                    speech_width=self.speech_encoder.config.d_model + self.beats.cfg.encoder_embed_dim,
                 )
             else:
                 self.speech_Qformer, self.speech_query_tokens = self.init_speech_Qformer(
@@ -214,16 +251,11 @@ class SALMONN(nn.Module):
         self.prompt_dict = {}
         if prompt_path:
             try:
-                with open(prompt_path, "r") as file:
+                with open(prompt_path, "r", encoding="utf-8") as file:
                     raw_prompts = json.load(file)
-            except json.JSONDecodeError:
-                print("Failed to decode JSON! Trying with utf-8 encoding.")
-                try:
-                    with open(prompt_path, "r", encoding="utf-8") as file:
-                        raw_prompts = json.load(file)
-                except json.JSONDecodeError as e:
-                    print(f"JSON decoding error even with utf-8 encoding: {e}")
-                    raise
+            except json.JSONDecodeError as e:
+                print(f"JSON decoding error with utf-8 encoding: {e}")
+                raise
             except IOError as e:
                 print(f"Failed to open or read the file: {e}")
                 raise
@@ -295,8 +327,12 @@ class SALMONN(nn.Module):
             # speech
             speech_embeds = self.speech_encoder(spectrogram, return_dict=True).last_hidden_state
             # non-speech
-            if self.beats_path and raw_wav is not None:
-                audio_embeds = self.beats.forward(raw_wav)
+            if self.ced_path and raw_wav is not None and not self.use_beats:
+                audio_embeds = self.ced.forward(raw_wav)
+            elif self.beats_path and raw_wav is not None and self.use_beats:
+                audio_embeds, _ = self.beats.extract_features(
+                    raw_wav, padding_mask=audio_padding_mask, feature_only=True
+                )
             else:
                 audio_embeds = None
 
@@ -414,11 +450,13 @@ class SALMONN(nn.Module):
             if not self.lora
             else self.llama_model.model.model.embed_tokens(to_regress_tokens.input_ids)
         )
+
         # -100 은 어텐션에서 무시해야하는 토큰 지정하여 loss 계산 시에도 무시
         # 길이를 맞추기 위해서 적용된 Padding token은 Cross-Entropy Loss 계산 시에는 필요가 없으니 이는 마스킹 처리
         targets = to_regress_tokens.input_ids.masked_fill(
             to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
         )
+
         # 마찬가지로 오디오 인코더에서 들어온 값들은 LLM이 출력하는 값이 아니기에 여기도 Loss 계산 시에 무시하기 위해서
         # 오디오 인코더 길이 만큼의 -100 으로 마스킹 처리
         empty_targets = (
@@ -531,10 +569,16 @@ class SALMONN(nn.Module):
 
     @classmethod
     def from_config(cls, config):
+        from dotenv import load_dotenv
+        load_dotenv()
+        token = os.environ['HF_KEY']
+
         llama_path = config.get("llama_path")
         whisper_path = config.get("whisper_path")
         freeze_whisper = config.get("freeze_whisper", True)
         beats_path = config.get("beats_path", "")
+        ced_path = config.get("ced_path", "")
+        use_beats = config.get("use_beats", False)
         freeze_beats = config.get("freeze_beats", True)
 
         use_speech_Qformer = config.get("use_speech_Qformer", True)
@@ -560,7 +604,6 @@ class SALMONN(nn.Module):
         low_resource = config.get("low_resource", False)
         device_8bit = config.get("device_8bit", 0)
 
-        token = config.get("token", None)
         only_preprocessor = config.get("only_preprocessor", None)
 
         model = cls(
@@ -568,6 +611,8 @@ class SALMONN(nn.Module):
             whisper_path=whisper_path,
             freeze_whisper=freeze_whisper,
             beats_path=beats_path,
+            ced_path=ced_path,
+            use_beats=use_beats,
             freeze_beats=freeze_beats,
             use_speech_Qformer=use_speech_Qformer,
             num_speech_query_token=num_speech_query_token,
