@@ -79,11 +79,11 @@ Audio adapter의 결합 및 사전학습을 통해, 언어모델은 음성/음�
 
 # 설정 및 사용법
 
-### 1. ``git clone https://github.com/boostcampaitech7/level4-nlp-finalproject-hackathon-nlp-07-lv3.git``
-### 2. Move to project directory
-### 3. ``pip install -r ./requirements.txt``
-### 4. ``python asr_inference.py`` for inference asr tasks
-### 4. ``python aac_inference.py`` for inference aac tasks
+1. ``git clone https://github.com/boostcampaitech7/level4-nlp-finalproject-hackathon-nlp-07-lv3.git``
+2. Move to project directory
+3. ``pip install -r ./requirements.txt``
+4. ``python asr_inference.py`` for inference asr tasks
+5. ``python aac_inference.py`` for inference aac tasks
 
 # config.yaml 사용법
 
