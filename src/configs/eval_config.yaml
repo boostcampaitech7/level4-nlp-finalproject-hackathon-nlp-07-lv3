@@ -36,7 +36,7 @@ model:
   prompt_path: "/path/to/prompt/prompt.json"  # (Required) 학습 프롬프트 파일 절대 경로
   test_prompt_path: "/path/to/prompt/test_prompt.json"  # (Required) 테스트 프롬프트 파일 절대 경로
   max_txt_len: 300  # (Required) 최대 텍스트 길이 (Default = 300)
-  end_sym: "<|end_of_text|>"  # (Required) 사용하는 LLM에 맞춰 변경
+  end_sym: "<|im_end|>"  # (Required) 사용하는 LLM에 맞춰 변경
 
 generate:
   max_new_tokens: 200  # (Required) 생성할 최대 토큰 수 (Default = 200)
@@ -47,7 +47,7 @@ generate:
   top_p: 0.9  # (Required) Top-p (nucleus) 샘플링 확률 (Default = 0.9)
   repetition_penalty: 1.0  # (Required) 반복 생성 패널티 (Default = 1.0)
   length_penalty: 1.0  # (Required) 길이 패널티 (Default = 1.0)
-  end_sym: "<|end_of_text|>"  # (Required) 생성 종료 토큰
+  end_sym: "<|im_end|>"  # (Required) 생성 종료 토큰
 
 datasets:
   # (Required) 데이터셋 절대 경로
