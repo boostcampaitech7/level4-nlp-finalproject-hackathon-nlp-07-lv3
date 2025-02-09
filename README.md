@@ -93,4 +93,63 @@ entity["text"] = ann["text"]
 KeyError: 'text'
 ```
 
- 
+# 프로젝트 구조
+```plaintext
+📦level4-nlp-finalproject-hackathon-nlp-07-lv3
+ ┣ 📂.git
+ ┣ 📂.github
+ ┣ 📂src
+ ┃ ┣ 📂configs
+ ┃ ┃ ┣ 📜eval_config.yaml
+ ┃ ┃ ┗ 📜train.yaml
+ ┃ ┣ 📂models
+ ┃ ┃ ┣ 📂beats
+ ┃ ┃ ┃ ┣ 📜backbone.py
+ ┃ ┃ ┃ ┣ 📜BEATs.py
+ ┃ ┃ ┃ ┣ 📜modules.py
+ ┃ ┃ ┃ ┣ 📜quantizer.py
+ ┃ ┃ ┃ ┣ 📜Tokenizers.py
+ ┃ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┃ ┣ 📂CED
+ ┃ ┃ ┃ ┗ 📂models
+ ┃ ┃ ┃ ┃ ┣ 📜audiotransformer.py
+ ┃ ┃ ┃ ┃ ┣ 📜checkpoints.py
+ ┃ ┃ ┃ ┃ ┣ 📜ensemble.py
+ ┃ ┃ ┃ ┃ ┣ 📜layers.py
+ ┃ ┃ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┃ ┣ 📜modeling_ced.py
+ ┃ ┃ ┣ 📜modeling_llama.py
+ ┃ ┃ ┣ 📜modeling_whisper.py
+ ┃ ┃ ┣ 📜Qformer.py
+ ┃ ┃ ┣ 📜salmonn.py
+ ┃ ┃ ┣ 📜utils.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂prompts
+ ┃ ┃ ┣ 📜test_prompt.json
+ ┃ ┃ ┗ 📜train_prompt.json
+ ┃ ┣ 📜config.py
+ ┃ ┣ 📜dataset.py
+ ┃ ┣ 📜dist_utils.py
+ ┃ ┣ 📜evaluate.py
+ ┃ ┣ 📜evaluate_efficiency_salmonn.py
+ ┃ ┣ 📜logger.py
+ ┃ ┣ 📜metrics.py
+ ┃ ┣ 📜optims.py
+ ┃ ┣ 📜runner.py
+ ┃ ┣ 📜salmonn_utils.py
+ ┃ ┣ 📜submission_validator.py
+ ┃ ┣ 📜train.py
+ ┃ ┣ 📜utils.py
+ ┃ ┗ 📜__init__.py
+ ┣ 📜.editorconfig
+ ┣ 📜.env
+ ┣ 📜.gitignore
+ ┣ 📜.pre-commit-config.yaml
+ ┣ 📜aac_inference.py
+ ┣ 📜asr_inference.py
+ ┣ 📜Makefile
+ ┣ 📜pyproject.toml
+ ┣ 📜README.md
+ ┣ 📜requirements.txt
+ ┗ 📜run.py
+```
