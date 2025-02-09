@@ -307,7 +307,7 @@ class LlamaDecoderLayer(nn.Module):
         return outputs
 
 
-LLAMA_START_DOCSTRING = r"""
+qwen_START_DOCSTRING = r"""
     This model inherits from [`PreTrainedModel`]. Check the superclass documentation for the generic methods the
     library implements for all its model (such as downloading or saving, resizing the input embeddings, pruning heads
     etc.)
@@ -326,7 +326,7 @@ LLAMA_START_DOCSTRING = r"""
 
 @add_start_docstrings(
     "The bare LLaMA Model outputting raw hidden-states without any specific head on top.",
-    LLAMA_START_DOCSTRING,
+    qwen_START_DOCSTRING,
 )
 class LlamaPreTrainedModel(PreTrainedModel):
     config_class = LlamaConfig
@@ -351,7 +351,7 @@ class LlamaPreTrainedModel(PreTrainedModel):
             module.gradient_checkpointing = value
 
 
-LLAMA_INPUTS_DOCSTRING = r"""
+qwen_INPUTS_DOCSTRING = r"""
     Args:
         input_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`):
             Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide
@@ -417,7 +417,7 @@ LLAMA_INPUTS_DOCSTRING = r"""
 
 @add_start_docstrings(
     "The bare LLaMA Model outputting raw hidden-states without any specific head on top.",
-    LLAMA_START_DOCSTRING,
+    qwen_START_DOCSTRING,
 )
 class LlamaModel(LlamaPreTrainedModel):
     """
@@ -470,7 +470,7 @@ class LlamaModel(LlamaPreTrainedModel):
 
         return combined_attention_mask
 
-    @add_start_docstrings_to_model_forward(LLAMA_INPUTS_DOCSTRING)
+    @add_start_docstrings_to_model_forward(qwen_INPUTS_DOCSTRING)
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -632,7 +632,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
     def get_decoder(self):
         return self.model
 
-    @add_start_docstrings_to_model_forward(LLAMA_INPUTS_DOCSTRING)
+    @add_start_docstrings_to_model_forward(qwen_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,

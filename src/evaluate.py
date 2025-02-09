@@ -102,8 +102,8 @@ def main(args):
     cfg = replace_test_ann_path(cfg)
     # Load models
     salmonn_preprocessor = load_preprocessor(cfg)
-    llama_model, tokenizer = load_model(salmonn_preprocessor)
-    salmonn_preprocessor.llama_model = llama_model
+    qwen_model, tokenizer = load_model(salmonn_preprocessor)
+    salmonn_preprocessor.qwen_model = qwen_model
 
     # Load data
     cfg.config.datasets['whisper_path'] = cfg.config.model['whisper_path']
@@ -146,7 +146,7 @@ def main(args):
             * tokenizer.bos_token_id
         )
 
-        bos_embeds = llama_model.model.model.embed_tokens(bos)
+        bos_embeds = qwen_model.model.model.embed_tokens(bos)
         atts_bos = speech_atts[:, :1]
 
         embeds = torch.cat([bos_embeds, speech_embeds], dim=1)
@@ -155,9 +155,9 @@ def main(args):
         generate_cfg = cfg.config.generate
 
         # Generation
-        outputs = llama_model.model.generate(
+        outputs = qwen_model.model.generate(
             inputs_embeds=embeds,
-            pad_token_id=llama_model.config.eos_token_id,  # Llama의 경우 llama_model.config.eos_token_id[0]
+            pad_token_id=qwen_model.config.eos_token_id,  # Llama의 경우 qwen_model.config.eos_token_id[0]
             max_new_tokens=generate_cfg.get("max_new_tokens", 200),
             num_beams=generate_cfg.get("num_beams", 4),
             do_sample=generate_cfg.get("do_sample", False),

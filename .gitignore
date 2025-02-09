@@ -51,3 +51,4 @@ test
 .idea
 *.xml
 *.json
+*.pin

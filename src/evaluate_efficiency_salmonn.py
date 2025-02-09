@@ -36,8 +36,8 @@ def set_seed(seed: int):
 
 
 def load_model(salmonn_preprocessor):
-    model = salmonn_preprocessor.llama_model
-    tokenizer = salmonn_preprocessor.llama_tokenizer
+    model = salmonn_preprocessor.qwen_model
+    tokenizer = salmonn_preprocessor.qwen_tokenizer
     return model, tokenizer
 
 
@@ -115,7 +115,7 @@ def get_gpu_memory_usage():
 def model_inference(cfg, samples, test_prompt, salmonn):
     # TTFT
     start_time = time.time()
-    llm = salmonn.llama_model
+    llm = salmonn.qwen_model
 
     batch_size = samples["spectrogram"].shape[0]
     spectrogram = samples["spectrogram"]
@@ -136,7 +136,7 @@ def model_inference(cfg, samples, test_prompt, salmonn):
             dtype=torch.int32,
             device=speech_embeds.device,
         )
-        * salmonn.llama_tokenizer.bos_token_id
+        * salmonn.qwen_tokenizer.bos_token_id
     )
     bos_embeds = llm.model.embed_tokens(bos) if not salmonn.lora else llm.model.model.embed_tokens(bos)
     atts_bos = speech_atts[:, :1]
@@ -176,8 +176,8 @@ def main(args):
 
     # Load model
     salmonn_preprocessor = load_preprocessor(cfg)
-    llama_model, _ = load_model(salmonn_preprocessor)
-    salmonn_preprocessor.llama_model = llama_model
+    qwen_model, _ = load_model(salmonn_preprocessor)
+    salmonn_preprocessor.qwen_model = qwen_model
 
     # 설정 파일에서 경로를 읽어옴
     test_prompt_path = cfg.config.model.test_prompt_path

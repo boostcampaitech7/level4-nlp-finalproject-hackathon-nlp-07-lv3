@@ -1,16 +1,16 @@
 model:
   # paths
-  llama_path: "meta-llama/Llama-3.2-1B-Instruct"  # (Required) LLaMA 모델 경로
+  qwen_path: "Qwen/Qwen2.5-0.5B-Instruct"  # (Required) LLaMA 모델 경로
   whisper_path: "openai/whisper-large-v3"  # (Required) Whisper 모델 경로
 
-  beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"  # (Optional) 다운로드 받은 BEATs 파일 경로
+  beats_path: "/path/to/beats/beats.pt"  # (Optional) 다운로드 받은 BEATs 파일 경로
   ced_path: "ced_small"  # (Optional) 사용하려는 CED 모델 경로 (Default = "ced_small")
   ckpt: ""  # (Optional) Stage 2 마친 모델의 .ckpt 또는 .pth 경로 (Default = "")
 
   use_beats: False  # (Optional) beats 모델의 사용여부 ced 사용시 False (Default = False)
 
   only_preprocessor: False  # (Optional) 전처리기만 실행할지 여부 (Default = False)
-  low_resource: True  # (Optional) 저자원 환경에서 최적화 여부 (Default = True)
+  low_resource: False  # (Optional) 저자원 환경에서 최적화 여부 (Default = True)
   freeze_whisper: True  # (Optional) Whisper 모델 가중치 고정 여부 (Default = True)
   freeze_beats: True  # (Optional) BEATs 모델 가중치 고정 여부 (Default = True)
 
@@ -22,8 +22,8 @@ model:
   second_per_window: 0.333333  # (Required) 윈도우당 길이 (초 단위) (Default = 0.333333)
   second_stride: 0.333333  # (Required) 윈도우 간 간격 (초 단위) (Default = 0.333333)
 
-  speech_llama_proj_model: ""  # (Optional) 음성-텍스트 프로젝션 모델 경로 (Default = "")
-  freeze_speech_llama_proj: False  # (Optional) 음성-텍스트 프로젝션 모델 가중치 고정 여부 (Default = False)
+  speech_qwen_proj_model: ""  # (Optional) 음성-텍스트 프로젝션 모델 경로 (Default = "")
+  freeze_speech_qwen_proj: False  # (Optional) 음성-텍스트 프로젝션 모델 가중치 고정 여부 (Default = False)
 
   # LoRA
   lora: True  # (Optional) LoRA 활성화 여부 (Default = True)
@@ -33,8 +33,8 @@ model:
 
   multi_prompt: True  # (Optional) 멀티 프롬프트 사용 여부 (Default = True)
   prompt_template: "USER: {}\nASSISTANT:"  # (Required) 프롬프트 템플릿
-  prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/train_prompt.json"  # (Required) 학습 프롬프트 파일 경로
-  test_prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/test_prompt.json"  # (Required) 테스트 프롬프트 파일 경로
+  prompt_path: "/path/to/prompt/prompt.json"  # (Required) 학습 프롬프트 파일 절대 경로
+  test_prompt_path: "/path/to/prompt/test_prompt.json"  # (Required) 테스트 프롬프트 파일 절대 경로
   max_txt_len: 300  # (Required) 최대 텍스트 길이 (Default = 300)
   end_sym: "<|end_of_text|>"  # (Required) 사용하는 LLM에 맞춰 변경
 
@@ -50,9 +50,12 @@ generate:
   end_sym: "<|end_of_text|>"  # (Required) 생성 종료 토큰
 
 datasets:
-  prefix: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/"  # (Required) 데이터셋 경로 프리픽스
-  test_ann_path_asr: "test_asr.json"  # (Required) ASR 테스트 데이터 경로
-  test_ann_path_aac: "test_aac.json"  # (Required) AAC 테스트 데이터 경로
+  # (Required) 데이터셋 절대 경로
+  # 이 경로 밑으로 각 annotaion path가 추가 되는 구조입니다.
+  # 따라서 flac, wav등의 데이터는 이 경로 하위에 추가해야 합니다.
+  prefix: "/path/to/data/"
+  test_ann_path_asr: "test_asr.json"  # (Required) ASR 테스트 데이터 경로 (ex. /path/to/data/test_asr.json)
+  test_ann_path_aac: "test_aac.json"  # (Required) AAC 테스트 데이터 경로 (ex. /path/to/data/test_aac.json)
 
 run:
   batch_size_eval: 8  # (Required) 평가 배치 크기 (Default = 8)

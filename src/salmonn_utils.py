@@ -21,8 +21,8 @@ def load_preprocessor(cfg):
 
 
 def load_model(salmonn_preprocessor):
-    model = salmonn_preprocessor.llama_model
-    tokenizer = salmonn_preprocessor.llama_tokenizer
+    model = salmonn_preprocessor.qwen_model
+    tokenizer = salmonn_preprocessor.qwen_tokenizer
     return model, tokenizer
 
 
