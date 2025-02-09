@@ -93,7 +93,7 @@ entity["text"] = ann["text"]
 KeyError: 'text'
 ```
 
-# 프로젝트 구조
+# 4. 프로젝트 구조
 ```plaintext
 📦level4-nlp-finalproject-hackathon-nlp-07-lv3
  ┣ 📂.git
