@@ -203,7 +203,6 @@ class Runner:
         logging.info("Averaged stats: " + str(metric_logger.global_avg()))
         return {k: "{:.3f}".format(meter.global_avg) for k, meter in metric_logger.meters.items()}
 
-    
     @torch.no_grad()
     def valid_epoch(self, epoch, split, decode=False, save_json=False):
         if not self.dryrun:
@@ -295,7 +294,6 @@ class Runner:
 
         return ret
 
-    
     def save_result(self, result, result_dir, filename):
         result_file = os.path.join(result_dir, "%s_rank%d.json" % (filename, get_rank()))
         final_result_file = os.path.join(result_dir, "%s.json" % filename)
