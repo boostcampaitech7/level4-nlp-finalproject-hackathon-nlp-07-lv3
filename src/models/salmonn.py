@@ -113,8 +113,13 @@ class SALMONN(nn.Module):
         self.low_resource = low_resource
 
         logging.info("Loading LLaMA Tokenizer")
-        self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path, use_fast=False, token=token)
-        self.llama_tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+        self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path,
+                                                             use_fast=False,
+                                                             token=token,
+                                                             trust_remote_code = True,
+                                                             padding_side="right",
+                                                             bos_token="<|im_start|>",
+                                                             eos_token="<|im_end|>")
         self.llama_tokenizer.padding_side = "right"
 
         if not only_preprocessor:
