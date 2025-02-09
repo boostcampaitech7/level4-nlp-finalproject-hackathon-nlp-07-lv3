@@ -7,8 +7,10 @@ model:
   # paths
   llama_path: "meta-llama/Llama-3.2-1B-Instruct"  # (Required) LLaMA 모델 경로
   whisper_path: "openai/whisper-large-v3"  # (Required) Whisper 모델 경로
-  #beats_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"  # (Required) BEATs 모델 절대 경로
+  beats_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"  # (Required) BEATs 모델 절대 경로
   ced_path: "ced_small"  # (Optional) 사용하려는 CED 모델 경로 (Default = "ced_small")
+
+  use_beats: False  # (Optional) beats 모델의 사용여부 ced 사용시 False (Default = False)
 
   # 기학습된 가중치 경로 (Optional)
   ckpt: ""  # (Optional) 학습된 모델 체크포인트 경로 (Default = "")
