@@ -153,6 +153,7 @@ class SALMONN(nn.Module):
                     r=lora_rank,
                     lora_alpha=lora_alpha,
                     lora_dropout=lora_dropout,
+                    target_modules = ["q_proj", "v_proj", "gate_proj"]
                 )
                 self.llama_model = get_peft_model(self.llama_model, self.peft_config)
                 self.llama_model.print_trainable_parameters()
