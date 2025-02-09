@@ -1,6 +1,7 @@
 import sys
-import torch
 from typing import Callable, Dict, Optional
+
+import torch
 
 
 _model_functions: Dict[str, Callable] = {

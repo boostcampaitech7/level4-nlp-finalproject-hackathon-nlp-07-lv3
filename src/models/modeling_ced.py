@@ -1,19 +1,20 @@
+from typing import Optional
+
 import torch
-import torch.nn.functional as F
 import torch.nn as nn
-from torch.cuda.amp import autocast
+import torch.nn.functional as F
 import torchaudio.transforms as audio_transforms
-
-from typing import Any, Callable, Optional, Tuple, Union
 from einops import rearrange
-from einops.layers.torch import Rearrange
+from torch.amp import autocast
 
-from .CED.models import *
+from .CED.models import *  # noqa
+
 
 class FrontEnd(nn.Sequential):
 
     def __init__(self,
                  f_min: int = 0,
+
                  sample_rate: int = 16000,
                  win_size: int = 512, # frame_length, BEATs에선 25ms 즉, 400 (본래 CED에서는 512)
                  center: bool = True,
@@ -40,12 +41,12 @@ class FrontEnd(nn.Sequential):
                                             hop_length=self.hop_size,
                                             n_mels=self.n_mels),
             audio_transforms.AmplitudeToDB(top_db=120))
-        
+
         self.register_buffer('fbank_mean', torch.tensor(15.41663))
         self.register_buffer('fbank_std', torch.tensor(6.55582))
 
     # Disable Autocast for FP16 training!
-    @autocast(enabled=False)
+    @autocast('cuda', enabled=False)
     def forward(self, x):
         x = super().forward(x)
         return (x - self.fbank_mean) / (2 * self.fbank_std) # BEATs와 동일 스케일링
@@ -69,13 +70,13 @@ class ExtendedCEDEncoder(AudioTransformer):
                  norm_layer=None,
                  act_layer=None,
                  init_values=None,
-                 target_length=3001, # Salmonn의 dataloader에서 input최대 30초로 상한 고정, (target_length 원래는 1012) 
+                 target_length=3001, # Salmonn의 dataloader에서 input최대 30초로 상한 고정, (target_length 원래는 1012)
                                      # T = floor[(L + 2*pad - win_length) / hop_length] + 1,  pad = n_fft//2 = 256
                                      # ex) 30초 오디오 → (30s * 16000) = 480,000 샘플
-                                     # L + 2 * pad = 480,000 + 512 = 480,512  
-                                     # 480,512 - 400 = 480,112  
-                                     # 480,112 / 160 = 3,000.7 → floor(3,000.7) = 3,000  
-                                     # T = 3,000 + 1 = 3,001  
+                                     # L + 2 * pad = 480,000 + 512 = 480,512
+                                     # 480,512 - 400 = 480,112
+                                     # 480,112 / 160 = 3,000.7 → floor(3,000.7) = 3,000
+                                     # T = 3,000 + 1 = 3,001
                  pooling='mean',
                  wavtransforms=None,
                  spectransforms=None,
@@ -108,7 +109,7 @@ class ExtendedCEDEncoder(AudioTransformer):
                     splits = torch.stack(splits[:-1], dim=0)
             else:
                 splits = torch.stack(splits[:-1], dim=0)
-            n_splits = len(splits)
+            len(splits)
             x = rearrange(splits, 'spl b c f t-> (spl b) c f t')
             x = self.forward_features(x)
         else:
@@ -121,7 +122,7 @@ class ExtendedCEDEncoder(AudioTransformer):
         x = self.front_end(x)
         x = self.forward_spectrogram(x)
         return x
-    
+
 def pad_audio(waveform, target_samples=480000):
     if waveform.size(-1) < target_samples:
         return F.pad(waveform, (0, target_samples - waveform.size(-1)))
@@ -133,12 +134,12 @@ def audiotransformer_tiny(num_classes: int = 527,
                           pretrained=False,
                           pretrained_url: str = 'https://zenodo.org/records/8275347/files/audiotransformer_tiny_mae_as_10s.pt?download=1',
                           **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=192,
-                        depth=12,
-                        num_heads=3,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 192,
+                        'depth': 12,
+                        'num_heads': 3,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -155,12 +156,12 @@ def ced_tiny(
         pretrained_url:
     str = 'https://zenodo.org/record/8275319/files/audiotransformer_tiny_mAP_4814.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=192,
-                        depth=12,
-                        num_heads=3,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 192,
+                        'depth': 12,
+                        'num_heads': 3,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -177,12 +178,12 @@ def audiotransformer_mini(
         pretrained_url:
     str = 'https://zenodo.org/record/8275347/files/audiotransformer_mini_mae_as_10s.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=256,
-                        depth=12,
-                        num_heads=4,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 256,
+                        'depth': 12,
+                        'num_heads': 4,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -199,12 +200,12 @@ def ced_mini(
         pretrained_url:
     str = 'https://zenodo.org/record/8275319/files/audiotransformer_mini_mAP_4896.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=256,
-                        depth=12,
-                        num_heads=4,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 256,
+                        'depth': 12,
+                        'num_heads': 4,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -221,12 +222,12 @@ def audiotransformer_small(
         pretrained_url:
     str = 'https://zenodo.org/record/8275347/files/audiotransformer_small_mae_as_10s.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=384,
-                        depth=12,
-                        num_heads=6,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 384,
+                        'depth': 12,
+                        'num_heads': 6,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -243,12 +244,12 @@ def ced_small(
         pretrained_url:
     str = 'https://zenodo.org/record/8275319/files/audiotransformer_small_mAP_4958.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=384,
-                        depth=12,
-                        num_heads=6,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 384,
+                        'depth': 12,
+                        'num_heads': 6,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -265,12 +266,12 @@ def audiotransformer_base(
         pretrained_url:
     str = 'https://zenodo.org/record/8275347/files/audiotransformer_base_mae_as_10s.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=768,
-                        depth=12,
-                        num_heads=12,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 768,
+                        'depth': 12,
+                        'num_heads': 12,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -287,12 +288,12 @@ def ced_base(
         pretrained_url:
     str = 'https://zenodo.org/record/8275319/files/audiotransformer_base_mAP_4999.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=768,
-                        depth=12,
-                        num_heads=12,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 768,
+                        'depth': 12,
+                        'num_heads': 12,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,
@@ -309,12 +310,12 @@ def audiotransformer_base_4740(
         pretrained_url:
     str = 'https://zenodo.org/record/7964975/files/audiotransformer_base_mAP_47_40.pt?download=1',
         **kwargs):
-    model_kwargs = dict(patch_size=16,
-                        embed_dim=768,
-                        depth=12,
-                        num_heads=12,
-                        mlp_ratio=4,
-                        outputdim=num_classes)
+    model_kwargs = {'patch_size': 16,
+                        'embed_dim': 768,
+                        'depth': 12,
+                        'num_heads': 12,
+                        'mlp_ratio': 4,
+                        'outputdim': num_classes}
     model_kwargs = dict(model_kwargs, **kwargs)
     return build_mdl(
         ExtendedCEDEncoder,

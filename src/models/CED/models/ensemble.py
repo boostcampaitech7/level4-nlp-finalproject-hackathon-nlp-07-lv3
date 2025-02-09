@@ -1,5 +1,6 @@
 import torch
 
+
 class EnsembleModel(torch.nn.Module):
 
     def __init__(self, models) -> None:

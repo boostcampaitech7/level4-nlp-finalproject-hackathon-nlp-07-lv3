@@ -1,60 +1,59 @@
 model:
   # paths
-  llama_path: "meta-llama/Llama-3.2-3B-Instruct"
-  whisper_path: "openai/whisper-large-v2"
-  beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" # 다운로드 받은 BEATs 파일 경로
-  ced_path: "" # beats나 ced 둘 중 하나는 비워둬야함
+  llama_path: "meta-llama/Llama-3.2-1B-Instruct"  # (Required) LLaMA 모델 경로
+  whisper_path: "openai/whisper-large-v3"  # (Required) Whisper 모델 경로
+  
+  # beats나 ced 둘 중 하나는 비워둬야함
+  beats_path: "/data/data_storage/model_weight/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"  # (Optional) 다운로드 받은 BEATs 파일 경로
+  ced_path: "ced_small"  # (Optional) 사용하려는 CED 모델 경로 (Default = "ced_small")
+  ckpt: ""  # (Optional) Stage 2 마친 모델의 .ckpt 또는 .pth 경로 (Default = "")
 
-  token: "" # 허깅페이스 토큰
-  only_preprocessor: False
-
-  ckpt: "" # stage2 마친 모델 .ckpt or .pth
-
-  freeze_whisper: True
-  freeze_beats: True
+  only_preprocessor: False  # (Optional) 전처리기만 실행할지 여부 (Default = False)
+  low_resource: True  # (Optional) 저자원 환경에서 최적화 여부 (Default = True)
+  freeze_whisper: True  # (Optional) Whisper 모델 가중치 고정 여부 (Default = True)
+  freeze_beats: True  # (Optional) BEATs 모델 가중치 고정 여부 (Default = True)
 
   # window-level Q-Former
-  use_speech_Qformer: True
-  freeze_speech_QFormer: False
-  window_level_Qformer: True
-  num_speech_query_token: 1
-  second_per_window: 0.333333
-  second_stride: 0.333333
+  use_speech_Qformer: True  # (Optional) 음성 Q-Former 사용 여부 (Default = True)
+  freeze_speech_QFormer: False  # (Optional) 음성 Q-Former 가중치 고정 여부 (Default = False)
+  window_level_Qformer: True  # (Optional) 윈도우 기반 Q-Former 활성화 여부 (Default = True)
+  num_speech_query_token: 1  # (Required) 음성 Q-Former에서 사용할 Query Token 개수 (Default = 1)
+  second_per_window: 0.333333  # (Required) 윈도우당 길이 (초 단위) (Default = 0.333333)
+  second_stride: 0.333333  # (Required) 윈도우 간 간격 (초 단위) (Default = 0.333333)
 
-  speech_llama_proj_model: ""
-  freeze_speech_llama_proj: False
+  speech_llama_proj_model: ""  # (Optional) 음성-텍스트 프로젝션 모델 경로 (Default = "")
+  freeze_speech_llama_proj: False  # (Optional) 음성-텍스트 프로젝션 모델 가중치 고정 여부 (Default = False)
 
   # LoRA
-  lora: True
-  lora_rank: 8
-  lora_alpha: 32
-  lora_dropout: 0.1
+  lora: True  # (Optional) LoRA 활성화 여부 (Default = True)
+  lora_rank: 8  # (Required) LoRA 랭크 값 (Default = 8)
+  lora_alpha: 32  # (Required) LoRA 알파 값 (Default = 32)
+  lora_dropout: 0.1  # (Required) LoRA 드롭아웃 비율 (Default = 0.1)
 
-  multi_prompt: True
-  prompt_template: "USER: {}\nASSISTANT:"
-  prompt_path: "./prompts/train_prompt.json"
-  test_prompt_path: "./prompts/test_prompt.json"
-  max_txt_len: 300
-  end_sym: "<|end_of_text|>" # 사용하는 LLM에 맞춰 변경
+  multi_prompt: True  # (Optional) 멀티 프롬프트 사용 여부 (Default = True)
+  prompt_template: "USER: {}\nASSISTANT:"  # (Required) 프롬프트 템플릿
+  prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/train_prompt.json"  # (Required) 학습 프롬프트 파일 경로
+  test_prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/test_prompt.json"  # (Required) 테스트 프롬프트 파일 경로
+  max_txt_len: 300  # (Required) 최대 텍스트 길이 (Default = 300)
+  end_sym: "<|end_of_text|>"  # (Required) 사용하는 LLM에 맞춰 변경
 
 generate:
-  max_new_tokens: 200
-  num_beams: 4
-  do_sample: False
-  min_length: 1
-  temperature: 1.0
-  top_p: 0.9
-  repetition_penalty: 1.0
-  length_penalty: 1.0
-  end_sym: "<|end_of_text|>"
+  max_new_tokens: 200  # (Required) 생성할 최대 토큰 수 (Default = 200)
+  num_beams: 4  # (Required) Beam search 사용 시 beam 개수 (Default = 4)
+  do_sample: False  # (Optional) 샘플링 여부 (Default = False)
+  min_length: 1  # (Required) 최소 생성 길이 (Default = 1)
+  temperature: 1.0  # (Required) 생성 온도 (Default = 1.0)
+  top_p: 0.9  # (Required) Top-p (nucleus) 샘플링 확률 (Default = 0.9)
+  repetition_penalty: 1.0  # (Required) 반복 생성 패널티 (Default = 1.0)
+  length_penalty: 1.0  # (Required) 길이 패널티 (Default = 1.0)
+  end_sym: "<|end_of_text|>"  # (Required) 생성 종료 토큰
 
 datasets:
-  prefix: "/data/data_storage"
-  test_ann_path_asr: "./data/test_asr.json"
-  test_ann_path_aac: "./data/test_aac.json"
-  whisper_path: "openai/whisper-large-v2"
+  prefix: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/"  # (Required) 데이터셋 경로 프리픽스
+  test_ann_path_asr: "test_asr.json"  # (Required) ASR 테스트 데이터 경로
+  test_ann_path_aac: "test_aac.json"  # (Required) AAC 테스트 데이터 경로
 
 run:
-  batch_size_eval: 8
-  num_workers: 4
-  device: "cuda"
+  batch_size_eval: 8  # (Required) 평가 배치 크기 (Default = 8)
+  num_workers: 4  # (Required) 데이터 로딩 워커 수 (Default = 4)
+  device: "cuda:0"  # (Required) 사용 GPU 설정

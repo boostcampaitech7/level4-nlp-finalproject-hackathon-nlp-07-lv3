@@ -32,14 +32,23 @@ class SALMONNTestDataset(Dataset):
 
         self.prefix = prefix
 
+        ann_path = prefix + ann_path
+        if not os.path.exists(ann_path):
+            raise ValueError(
+                f"Provided prefix path '{prefix}' is not an absolute path. "
+                "Please provide an absolute path to the dataset. fix run.prefix which is in configs/train.yaml"
+            )
+
         self.annotation = json.load(open(ann_path, "r"))["annotation"]
-
         self.wav_processor = WhisperFeatureExtractor.from_pretrained(whisper_path)
-
         self.task = task
 
     def __len__(self):
         return len(self.annotation)
+
+    def _get_audio_path(self, path):
+        # 경로를 정규화하여 // 또는 / 문제를 해결
+        return os.path.normpath(os.path.join(self.prefix, path.lstrip('/').lstrip('\\')))
 
     def collater(self, samples):
         samples_spectrogram = [s["spectrogram"] for s in samples]
@@ -77,7 +86,8 @@ class SALMONNTestDataset(Dataset):
 
     def __getitem__(self, index):
         ann = self.annotation[index]
-        audio_path = os.path.join(self.prefix, ann["path"])
+        audio_path = self._get_audio_path(ann["path"])
+
         try:
             audio, sr = sf.read(audio_path)
         except (RuntimeError, IOError) as e:

@@ -43,7 +43,6 @@ class Runner:
         self.use_distributed = self.config.config.run.use_distributed
         self.start_epoch = 0
         self.max_epoch = self.config.config.run.optims.max_epoch
-        self.evaluate_only = self.config.config.run.evaluate
         self.cuda_enabled = self.device.type == "cuda"
 
         # test prompt
@@ -51,16 +50,11 @@ class Runner:
         test_prompt_path = self.config.config.model.get("test_prompt_path", "")
         if test_prompt_path:
             try:
-                with open(test_prompt_path, "r") as f:
+                with open(test_prompt_path, "r", encoding="utf-8") as f:
                     self.test_prompt_dict = json.load(f)
-            except json.JSONDecodeError:
-                print("Failed to decode JSON! Trying with utf-8 encoding.")
-                try:
-                    with open(test_prompt_path, "r", encoding="utf-8") as f:
-                        self.test_prompt_dict = json.load(f)
-                except json.JSONDecodeError as e:
-                    print(f"JSON decoding error even with utf-8 encoding: {e}")
-                    raise
+            except json.JSONDecodeError as e:
+                print(f"JSON decoding error with utf-8 encoding: {e}")
+                raise
             except IOError as e:
                 print(f"Failed to open or read the file: {e}")
                 raise
@@ -112,7 +106,7 @@ class Runner:
         # scaler
         self.use_amp = self.config.config.run.get("amp", False)
         if self.use_amp:
-            self.scaler = torch.cuda.amp.GradScaler()
+            self.scaler = torch.amp.GradScaler()
         else:
             self.scaler = None
 
@@ -165,7 +159,7 @@ class Runner:
             if not self.dryrun:
                 self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
-                with torch.cuda.amp.autocast(enabled=self.use_amp):
+                with torch.amp.autocast('cuda', enabled=self.use_amp):
                     loss = self.model(samples)["loss"]
 
                 if self.use_amp:
@@ -195,6 +189,9 @@ class Runner:
                             "train/lr": self.optimizer.param_groups[0]["lr"],
                         }
                     )
+                # 1만 iter 마다 체크포인트 저장
+                if i > 0 and i % 10000 == 0:
+                    self.save_checkpoint(cur_epoch = epoch, iteration = i, is_best=False)
             else:  # dryrun, no model availble
                 metric_logger.update(loss=0.0)
                 metric_logger.update(lr=0.0)
@@ -205,97 +202,6 @@ class Runner:
         metric_logger.synchronize_between_processes()
         logging.info("Averaged stats: " + str(metric_logger.global_avg()))
         return {k: "{:.3f}".format(meter.global_avg) for k, meter in metric_logger.meters.items()}
-
-    @torch.no_grad()
-    def valid_epoch(self, epoch, split, decode=False, save_json=False):
-        if not self.dryrun:
-            model = self.unwrap_dist_model(self.model)
-            model.eval()
-
-        dataloader = getattr(self, split + "_loader", None)
-        assert dataloader is not None, "{}_loader does not exist.".format(split)
-
-        metric_logger = MetricLogger(delimiter="  ")
-        header = "Eval: data epoch: [{}]".format(epoch)
-
-        results = []
-        for samples in metric_logger.log_every(dataloader, self.config.config.run.log_freq, header=header):
-            samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled, device=self.config.config.run.device)
-
-            if not self.dryrun:
-                with torch.cuda.amp.autocast(enabled=self.use_amp):
-                    forward_result = model(samples, verbose=True)
-                loss = forward_result.get("loss", 0)
-                correct = forward_result.get("correct", 0)
-                total = forward_result.get("total", 1)
-                res = {
-                    "id": samples["id"],
-                    "ground_truth": samples["text"],
-                    "loss": loss.item(),
-                    "acc": (correct / total).item(),
-                    "total": total,
-                }
-            else:
-                res = {
-                    "id": samples["id"],
-                    "ground_truth": samples["text"],
-                    "loss": 0.0,
-                    "acc": 0.0,
-                    "total": 1,
-                }
-
-            if decode:
-                if model.prompt_dict:
-                    if self.test_prompt_dict is None:
-                        prompts = None
-                    else:
-                        prompts = [self.test_prompt_dict[s] for s in samples["task"]]
-                        if "Q" in samples:
-                            prompts = [p.format(q) if "{}" in p else p for p, q in zip(prompts, samples["Q"])]
-                else:
-                    prompts = None
-
-                text = model.generate(samples, self.config.config.run, prompts=prompts)
-                res["text"] = text
-                res["prompt"] = prompts
-                res["task"] = samples["task"]
-
-            results.append(res)
-
-        if is_dist_avail_and_initialized():
-            dist.barrier()
-
-        if save_json:
-            self.save_result(results, self.output_dir, "eval_{}_epoch_{}".format(split, epoch))
-
-        res = {
-            "loss": torch.tensor(0).float().cuda(),
-            "n_sample": torch.tensor(0).float().cuda(),
-            "correct": torch.tensor(0).float().cuda(),
-            "n_token": torch.tensor(0).float().cuda(),
-        }
-
-        for item in results:
-            item_loss = item["loss"]
-            item_n_sample = len(item["id"])
-            item_correct = item["acc"] * item["total"]
-            item_n_token = item["total"]
-            res["loss"] += item_loss * item_n_sample
-            res["n_sample"] += item_n_sample
-            res["correct"] += item_correct
-            res["n_token"] += item_n_token
-
-        if is_dist_avail_and_initialized():
-            dist.all_reduce(res["loss"])
-            dist.all_reduce(res["n_sample"])
-            dist.all_reduce(res["correct"])
-            dist.all_reduce(res["n_token"])
-
-        ret = {"loss": 0, "agg_metrics": 0}
-        ret["loss"] = (res["loss"] / res["n_sample"]).item()
-        ret["agg_metrics"] = (res["correct"] / res["n_token"]).item()
-
-        return ret
 
     def save_result(self, result, result_dir, filename):
         result_file = os.path.join(result_dir, "%s_rank%d.json" % (filename, get_rank()))
@@ -333,47 +239,19 @@ class Runner:
 
     def train(self):
         start_time = time.time()
-        best_agg_metric = 0
-        best_epoch = 0
         best_save_directory = None  # 가장 좋은 모델 경로를 추적
 
         for cur_epoch in range(self.start_epoch, self.max_epoch):
-            if self.evaluate_only:
-                break
-
             # training phase
             logging.info("Training Phase")
             train_stats = self.train_epoch(cur_epoch)
             self.log_stats(train_stats, split_name="train")
 
-            # validating phase
-            logging.info("Validating Phase")
-            valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
-            if valid_log is not None:
-                if is_main_process():
-                    agg_metrics = valid_log["agg_metrics"]
-                    if agg_metrics > best_agg_metric:
-                        best_agg_metric = agg_metrics
-                        best_epoch = cur_epoch
-
-                        # 평가 메트릭을 통해서 Best 모델인 경우 저장
-                        best_save_directory = self.save_checkpoint(cur_epoch, is_best=True)
-
-                    valid_log.update({"best_epoch": best_epoch})
-                    self.log_stats(valid_log, split_name="valid")
-                    wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
-
             if self.use_distributed:
                 dist.barrier()
 
         # 가장 마지막 epoch의 모델은 val결과와 무관하게 저장
-        last_save_directory = self.save_checkpoint(cur_epoch, is_best=False)
-
-        # testing phase
-        if self.evaluate_only:
-            test_log = self.valid_epoch("best", "test", decode=True, save_json=True)
-            if test_log is not None:
-                self.log_stats(test_log, split_name="test")
+        last_save_directory = self.save_checkpoint(cur_epoch, iteration="last", is_best=False)
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -396,7 +274,7 @@ class Runner:
             pass
 
     @main_process
-    def save_checkpoint(self, cur_epoch, is_best=False):
+    def save_checkpoint(self, cur_epoch, iteration, is_best=False):
         """
         Save the checkpoint at the current epoch.
         """
@@ -419,9 +297,9 @@ class Runner:
         if is_best:
             save_to = os.path.join(self.output_dir, "checkpoint_best.pth")
         else:
-            save_to = os.path.join(self.output_dir, f"checkpoint_{cur_epoch}.pth")
+            save_to = os.path.join(self.output_dir, f"checkpoint_{cur_epoch}_{iteration}.pth")
 
-        logging.info(f"Saving checkpoint at epoch {cur_epoch} to {save_to}.")
+        logging.info(f"Saving checkpoint at epoch {cur_epoch}_{iteration} to {save_to}.")
         torch.save(save_obj, save_to)
 
         # Keep only the most recent two checkpoints
