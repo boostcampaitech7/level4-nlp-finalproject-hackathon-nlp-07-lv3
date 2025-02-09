@@ -41,7 +41,7 @@ model:
   prompt_path: "/path/to/prompt/prompt.json"  # (Required) 학습 프롬프트 파일 절대 경로
   test_prompt_path: "/path/to/prompt/test_prompt.json"  # (Required) 테스트 프롬프트 파일 절대 경로
   max_txt_len: 300  # (Required) 최대 텍스트 길이 (Default = 300)
-  end_sym: "<|eot_id|>"  # (Required) LLM 모델의 종료 토큰
+  end_sym: "<|im_end|>"  # (Required) LLM 모델의 종료 토큰
 
 datasets:
   # (Required) 데이터셋 절대 경로
