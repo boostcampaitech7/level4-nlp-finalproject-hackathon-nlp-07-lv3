@@ -338,6 +338,21 @@ class Runner:
             train_stats = self.train_epoch(cur_epoch)
             self.log_stats(train_stats, split_name="train")
 
+            # validating phase
+            logging.info("Validating Phase")
+            valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
+            if valid_log is not None:
+                if is_main_process():
+                    agg_metrics = valid_log["agg_metrics"]
+                    if agg_metrics > best_agg_metric:
+                        best_agg_metric = agg_metrics
+                        best_epoch = cur_epoch
+                        # 평가 메트릭을 통해서 Best 모델인 경우 저장
+                        best_save_directory = self.save_checkpoint(cur_epoch, is_best=True)
+                    valid_log.update({"best_epoch": best_epoch})
+                    self.log_stats(valid_log, split_name="valid")
+                    wandb.log({"valid/epoch": cur_epoch, "valid/agg_metrics": agg_metrics})
+
             if self.use_distributed:
                 dist.barrier()
 
