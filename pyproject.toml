@@ -1,0 +1,35 @@
+[tool.ruff]
+line-length = 119
+exclude = [
+  ".git",
+  ".hg",
+  ".mypy_cache",
+  ".tox",
+  ".venv",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "env",
+  "venv",
+]
+
+
+[tool.ruff.lint]
+ignore = ["C901", "E501", "E402"]                       
+select = ["C", "E", "F", "I", "W"]                      
+
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401", "F403", "F811"]        
+
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2                                  
+
+
+[tool.ruff.format]
+quote-style = "double"                                   
+indent-style = "space"                                   
+skip-magic-trailing-comma = false                        
+line-ending = "auto"                                     
