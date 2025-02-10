@@ -1,0 +1,45 @@
+# 이 파일이 최상위 EditorConfig 파일임을 나타낸다. 즉, 이 파일보다
+# 상위 디렉토리에 다른 EditorConfig 파일이 있더라도 무시되는 것.
+root = true
+
+# 이하는 모든 파일에 적용되는 설정임.
+[*]
+
+# 파일의 문자 인코딩을 UTF-8로 설정함.
+charset = utf-8
+
+# 줄 끝 문자를 LF(Line Feed)로 설정함. 이는 주로 유닉스 계열 시스템에서 사용됨.
+end_of_line = lf
+
+# 파일의 마지막에 새 줄을 추가함.
+insert_final_newline = true
+
+# 들여쓰기를 공백으로 설정
+indent_style = space
+
+# 들여쓰기 크기를 2칸으로 설정함
+indent_size = 2
+
+# 줄 끝의 불필요한 공백을 제거함
+trim_trailing_whitespace = true
+
+# 이하는 .py 또는 .pyi 확장자를 가진 파일에 적용되는 설정임.
+[*.py]
+
+# 들여쓰기를 공백으로 설정
+indent_style = space
+
+# 들여쓰기 크기를 4칸으로 설정
+indent_size = 4
+
+# 이하는 Makefile에 적용되는 설정을 정의함.
+[Makefile]
+
+# 들여쓰기를 탭으로 설정
+indent_style = tab
+
+# .md 확장자를 가진 파일에 적용되는 설정을 의미함.
+[*.md]
+
+# 줄 끝의 불필요한 공백을 제거하지 않음
+trim_trailing_whitespace = false
