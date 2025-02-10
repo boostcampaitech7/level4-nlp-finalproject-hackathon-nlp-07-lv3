@@ -58,12 +58,12 @@ VRAM의 크기가 작은 전형적인 디바이스 환경에서는 오디오 언
 
 | 팀원  | 역할                                                        |
 |-----|-----------------------------------------------------------|
-| 홍성균 | Team Leader,           |
-| 강신욱 |                                     |
-| 박규태 |                    |
+| 홍성균 | Team Leader, base line 작성, Data EDA, 모델 탐색          |
+| 강신욱 | Data EDA, 모델 탐색                      |
+| 박규태 | CED 아키텍처 적용, 지식증류,모델 탐색        |
 | 이정민 | Nvidia Canary, Optimization                               |
-| 장요한 |                        |
-| 한동훈 |  |
+| 장요한 |   모델 탐색            |
+| 한동훈 | Data EDA, 모델 탐색 |
 
 
 </div>
@@ -77,13 +77,13 @@ VRAM의 크기가 작은 전형적인 디바이스 환경에서는 오디오 언
 </div>
 
 ---
-# 3. How to use
-
-1. ``git clone https://github.com/boostcampaitech7/level4-nlp-finalproject-hackathon-nlp-07-lv3.git``
-2. Move to project directory
-3. ``pip install -r ./requirements.txt``
-4. ``python asr_inference.py`` for inference asr tasks
-5. ``python aac_inference.py`` for inference aac tasks
+# 3. How to use (conda 기준)
+1. conda create -n inference_test python==3.9.17
+2. ``git clone https://github.com/boostcampaitech7/level4-nlp-finalproject-hackathon-nlp-07-lv3.git``
+3. Move to project directory
+4. ``pip install -r requirements.txt ``
+5. ``python asr_inference.py`` for inference asr tasks
+6. ``python aac_inference.py`` for inference aac tasks
 
 # How to use config.yaml
 1. wandb : wandb 기록에 대한 설정
@@ -173,7 +173,7 @@ CUDA Version: 12.2
 ## Final Score
 ```plaintext
 ASR Score :  6.99%
-AAC Score : 35.93%
+AAC Score : 36.15%
 Inference Speed : 0.1722(TTFT) + 0.038(TPOT) = 0.2102 second
 VRAM Usage : 3.83 GB
 ```
