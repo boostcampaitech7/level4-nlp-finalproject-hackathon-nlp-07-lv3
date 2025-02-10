@@ -5,13 +5,13 @@ wandb:
 
 model:
   # paths
-  llama_path: "meta-llama/Llama-3.2-1B-Instruct"  # (Required) LLaMA 모델 경로
-  whisper_path: "openai/whisper-large-v3"  # (Required) Whisper 모델 경로
-  #beats_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"  # (Required) BEATs 모델 절대 경로
+  llama_path: "Qwen/Qwen2.5-0.5B-Instruct"  # (Required) LLaMA 모델 경로
+  whisper_path: "openai/whisper-large-v3-turbo"  # (Required) Whisper 모델 경로
+  # beats_path: "path/to/beats/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"  # (Required) BEATs 모델 절대 경로
   ced_path: "ced_small"  # (Optional) 사용하려는 CED 모델 경로 (Default = "ced_small")
 
   # 기학습된 가중치 경로 (Optional)
-  ckpt: ""  # (Optional) 학습된 모델 체크포인트 경로 (Default = "")
+  ckpt: "path/to/checkpoint.pth"  # (Optional) 학습된 모델 체크포인트 경로 (Default = "")
 
   low_resource: False  # (Optional) 저자원 환경에서 최적화 여부 (Default = False)
   freeze_whisper: True  # (Optional) Whisper 모델 가중치 고정 여부 (Default = True)
@@ -36,22 +36,22 @@ model:
 
   multi_prompt: True  # (Optional) 멀티 프롬프트 사용 여부 (Default = True)
   prompt_template: "USER: {}\nASSISTANT:"  # (Required) 프롬프트 템플릿
-  prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/train_prompt.json"  # (Required) 학습 프롬프트 파일 경로
-  test_prompt_path: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/prompts/test_prompt.json"  # (Required) 테스트 프롬프트 파일 경로
+  prompt_path: "path/to/src/prompts/train_prompt.json"  # (Required) 학습 프롬프트 파일 절대 경로
+  test_prompt_path: "path/to/src/prompts/test_prompt.json"  # (Required) 테스트 프롬프트 절대 파일 경로
 
   max_txt_len: 300  # (Required) 최대 텍스트 길이 (Default = 300)
-  end_sym: "<|eot_id|>"  # (Required) LLM 모델의 종료 토큰
+  end_sym: "<|im_end|>"  # (Required) 사용하는 LLM에 맞춰 변경
 
 datasets:
   # (Required) 데이터셋 절대 경로
   prefix: "/e/Github/BoostClass AI Tech/Final Project/level4-nlp-finalproject-hackathon-nlp-07-lv3/src/data/"
 
   stage1_use_valid: False  # (Optional) Stage 1에서 검증 데이터 사용 여부 (Default = False)
-  train_stage1_path: "n_stage_1_sample_data_V2.json"  # (Required) 학습 데이터 상대 경로
+  train_stage1_path: "final_stage_1_no_duplicates.json"  # (Required) 학습 데이터 상대 경로
   valid_stage1_path: ""  # (Optional) 검증 데이터 상대 경로 (Default = "")
 
   stage2_use_valid: False
-  train_stage2_path: "n_stage_1_sample_data_V2.json"
+  train_stage2_path: "final_stage_2_no_duplicates.json"
   valid_stage2_path: ""
 
 run:
