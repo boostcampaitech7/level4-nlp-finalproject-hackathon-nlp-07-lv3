@@ -19,7 +19,7 @@ set-dev:
 	pip3 install -r requirements.txt
 
 set-style:
-	ruff check --fix .
+	ruff check --fix  .
 	ruff format .
 
 check-quality:
