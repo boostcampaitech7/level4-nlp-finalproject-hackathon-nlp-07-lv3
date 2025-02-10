@@ -78,12 +78,14 @@ VRAM의 크기가 작은 전형적인 디바이스 환경에서는 오디오 언
 
 ---
 # 3. How to use (conda 기준)
-1. conda create -n inference_test python==3.9.17
+1. ``conda create -n inference_test python==3.9.17``
 2. ``git clone https://github.com/boostcampaitech7/level4-nlp-finalproject-hackathon-nlp-07-lv3.git``
 3. Move to project directory
-4. ``pip install -r requirements.txt ``
-5. ``python asr_inference.py`` for inference asr tasks
-6. ``python aac_inference.py`` for inference aac tasks
+4. ``.env``, ``configs/eval_config.yaml`` 형식에 맞춰 작성
+5. ``test_aac.json``, ``test_asr.json``을 사용하는 데이터 경로에 맞춰 이동시켜줌
+6. ``pip install -r requirements.txt ``
+7. ``python asr_inference.py`` for inference asr tasks
+8. ``python aac_inference.py`` for inference aac tasks
 
 # How to use config.yaml
 1. wandb : wandb 기록에 대한 설정
