@@ -158,7 +158,7 @@ def main(args):
         # Generation
         outputs = llama_model.model.generate(
             inputs_embeds=embeds,
-            pad_token_id=llama_model.config.eos_token_id[0],  # 어떤 대는 [0] 같은 별도의 인덱싱 불요
+            pad_token_id=llama_model.config.eos_token_id,  # Llama의 경우 [0] 같은 별도의 인덱싱 불요
             max_new_tokens=generate_cfg.get("max_new_tokens", 200),
             num_beams=generate_cfg.get("num_beams", 4),
             do_sample=generate_cfg.get("do_sample", False),
