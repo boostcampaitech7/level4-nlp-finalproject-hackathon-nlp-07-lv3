@@ -111,7 +111,14 @@ class SALMONN(nn.Module):
         self.low_resource = low_resource
 
         logging.info("Loading LLaMA Tokenizer")
-        self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path, use_fast=False, token=token)
+        self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_path,
+                                                             use_fast=False,
+                                                             token=token,
+                                                             trust_remote_code = True,
+                                                             padding_side="right",
+                                                             bos_token="<|im_start|>",
+                                                             eos_token="<|im_end|>")
+
         self.llama_tokenizer.add_special_tokens({"pad_token": "[PAD]"})
         self.llama_tokenizer.padding_side = "right"
 
@@ -131,6 +138,7 @@ class SALMONN(nn.Module):
                     llama_path,
                     torch_dtype=torch.float16,
                     token=token,
+                    # attn_implementation="sdpa", # flash attention
                 )
 
             # 모델 토큰나이저의 사전에 새로운 토큰을 추가하면서 임베딩 레이어 크기가 변화할 필요가 있으니 그에 따라 사이즈를 조정하는 코드
@@ -146,6 +154,7 @@ class SALMONN(nn.Module):
                     r=lora_rank,
                     lora_alpha=lora_alpha,
                     lora_dropout=lora_dropout,
+                    target_modules = ["q_proj", "v_proj", "gate_proj"]
                 )
                 self.llama_model = get_peft_model(self.llama_model, self.peft_config)
                 self.llama_model.print_trainable_parameters()
