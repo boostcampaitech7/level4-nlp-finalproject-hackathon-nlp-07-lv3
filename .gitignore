@@ -1,0 +1,52 @@
+# 바이트 컴파일된 Python 파일들 무시
+__pycache__/
+*.py[cod]
+
+# 가상 환경설정 파일 무시
+venv/
+env/
+.env
+
+# 모델 체크포인트 및 로그(대용량 및 불필요하므로 무시)
+checkpoints/
+outputs_stage*/
+wandb/
+logs/
+*.pt
+*.pth
+*.ckpt
+*.csv
+submission_results/
+
+# 데이터셋(대용량 이므로 불포함)
+data/
+
+# IDE 설정 파일
+.vscode/
+
+# 임시 파일
+*.tmp
+*.bak
+
+# 시스템 파일(macOS 또는 Windows에서 자동으로 생성되는 시스템 파일) 무시
+.DS_Store
+Thumbs.db
+
+# ruff 캐시 무시
+.ruff_cache/
+
+# 개인 설정값 무시
+*.yaml
+*.yml
+
+src/lm_evaluation_harness/*
+src/LLMPruner/*
+
+src/Multi_Level_OT_main
+src/Multi-Level-OT-main
+
+# 실험 파일 및 pycharm 무시
+test
+.idea
+*.xml
+*.json
