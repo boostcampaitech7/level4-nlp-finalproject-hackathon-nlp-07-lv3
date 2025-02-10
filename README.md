@@ -179,3 +179,6 @@ AAC Score : 36.15%
 Inference Speed : 0.1722(TTFT) + 0.038(TPOT) = 0.2102 second
 VRAM Usage : 3.83 GB
 ```
+## train dataset 재현
+- ``src/data/data_sampling.ipynb`` 에 명시된 목차 따라 진행
+- 단, 기제공된 ``stage2_train.json``에 기록된 ``path``부분이 원본 data 폴더의 `audiocaps`가 아니라 ``audiocaps_1m``으로 바뀌어 있음 주의 
