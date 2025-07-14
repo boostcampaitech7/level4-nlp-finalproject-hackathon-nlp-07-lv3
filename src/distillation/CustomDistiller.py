@@ -7,7 +7,6 @@ from textbrewer.distiller_utils import *
 sys.path.append('./src/Multi_Level_OT_main')
 from Multi_Level_OT_main.models.distillation_model import DistillationLoss
 from distillation.utils import (
-                                dynamic_temperature,
                                 minmax_normalize,
                                 softmax_normalize,
                                 standardize_tensor,
@@ -16,7 +15,7 @@ from distillation.utils import (
                                 custom_post_adaptor,
                                 CustomDict
                             )
-from distillation.losses import dynamic_kd_loss, encoder_kd_loss, KL_divergence, KL_divergence_token_level, QFormerDistiller
+from distillation.losses import dynamic_kd_loss, encoder_kd_loss, KL_divergence, KL_divergence_token_level, QFormerDistiller, dynamic_temperature
 from utils import move_to_cuda
 
 class CustomDistiller(GeneralDistiller):
