@@ -19,6 +19,26 @@ def dynamic_kd_loss(student_logits, teacher_logits, temperature=1.0):
     weighted_kld = torch.mean(batch_loss * instance_weight)
     return weighted_kld
 
+def dynamic_temperature(student_logits, teacher_logits, normalization_type=''):
+    if len(normalization_type)>0:
+        if normalization_type=='minmax':
+            student_logits = minmax_normalize(student_logits)
+            teacher_logits = minmax_normalize(teacher_logits)
+        elif normalization_type=='softmax':
+            student_logits = softmax_normalize(student_logits)
+            teacher_logits = softmax_normalize(teacher_logits)
+        elif normalization_type == 'standardize':
+            student_logits = standardize_tensor(student_logits)
+            teacher_logits = standardize_tensor(teacher_logits)
+
+    tea_std = torch.std(teacher_logits, dim=-1,keepdim=True)
+    stu_std= torch.std(student_logits, dim=-1, keepdim=True)
+    p_s = F.log_softmax(student_logits/tea_std, dim=1)
+    p_t = F.softmax(teacher_logits/stu_std, dim=1)
+
+    loss = torch.sum(torch.sum(F.kl_div(p_s, p_t, reduction='none'), dim=-1) * (1 * torch.ones(student_logits.shape[0],1).cuda())) /student_logits.shape[0]/ student_logits.shape[0]
+    return loss
+
 def KL_divergence_token_level(logits_S, logits_T, valid_mask, temperature=3.0):
     """
     logits_S, logits_T : (L, V)

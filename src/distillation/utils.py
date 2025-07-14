@@ -27,26 +27,6 @@ def standardize_tensor(tensor, dim=-1):
 
     return standardized_tensor
 
-def dynamic_temperature(student_logits, teacher_logits, normalization_type=''):
-    if len(normalization_type)>0:
-        if normalization_type=='minmax':
-            student_logits = minmax_normalize(student_logits)
-            teacher_logits = minmax_normalize(teacher_logits)
-        elif normalization_type=='softmax':
-            student_logits = softmax_normalize(student_logits)
-            teacher_logits = softmax_normalize(teacher_logits)
-        elif normalization_type == 'standardize':
-            student_logits = standardize_tensor(student_logits)
-            teacher_logits = standardize_tensor(teacher_logits)
-
-    tea_std = torch.std(teacher_logits, dim=-1,keepdim=True)
-    stu_std= torch.std(student_logits, dim=-1, keepdim=True)
-    p_s = F.log_softmax(student_logits/tea_std, dim=1)
-    p_t = F.softmax(teacher_logits/stu_std, dim=1)
-
-    loss = torch.sum(torch.sum(F.kl_div(p_s, p_t, reduction='none'), dim=-1) * (1 * torch.ones(student_logits.shape[0],1).cuda())) /student_logits.shape[0]/ student_logits.shape[0]
-    return loss
-
 def pad_logits(student_logits, teacher_logits, padding_value=-100):
     if len(student_logits.shape) == 3: student_logits = student_logits.squeeze(0)
     if len(teacher_logits.shape) == 3: teacher_logits = teacher_logits.squeeze(0)
